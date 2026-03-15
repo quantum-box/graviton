@@ -709,9 +709,9 @@ export default function Dashboard() {
             <Group orientation="horizontal" className="h-full">
               <Panel
                 panelRef={leftPanelRef}
-                defaultSize="8%"
-                minSize="6%"
-                maxSize="12%"
+                defaultSize="6%"
+                minSize="5%"
+                maxSize="8%"
                 collapsible
                 collapsedSize={0}
                 className="border-r border-[var(--panel-border)] bg-[var(--panel-bg)]"
@@ -752,7 +752,7 @@ export default function Dashboard() {
 
               <Separator className="desktop-resize-handle" />
 
-              <Panel defaultSize="64%" minSize="42%">
+              <Panel defaultSize="80%" minSize="72%">
                 <div className="relative flex h-full flex-col bg-[#232323]">
                   <div className="border-b border-[var(--panel-border)] bg-[var(--panel-header)] px-4 py-2.5">
                     <div className="flex items-center justify-between">
@@ -767,7 +767,7 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  <div className="relative min-h-0 flex-1 bg-[#2b2b2b] p-3">
+                  <div className="relative min-h-0 flex-1 bg-[#2b2b2b] p-2">
                     <div className="relative h-full overflow-hidden rounded-[14px] border border-[#111] bg-[#202020] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
                       <ErrorBoundary fallbackTitle={t('shell.mapCanvas')}>
                         <MapView
@@ -869,9 +869,9 @@ export default function Dashboard() {
 
               <Panel
                 panelRef={rightPanelRef}
-                defaultSize="28%"
-                minSize="20%"
-                maxSize="36%"
+                defaultSize="14%"
+                minSize="12%"
+                maxSize="18%"
                 collapsible
                 collapsedSize={0}
                 className="border-l border-[var(--panel-border)] bg-[var(--panel-bg)]"

@@ -21,15 +21,14 @@ export function ScaleBar({ zoom, latitude }: { zoom: number; latitude: number })
   }, [latitude, zoom])
 
   return (
-    <div className="pointer-events-none absolute bottom-4 left-4 z-20 rounded-2xl border border-white/10 bg-[#07111b]/85 px-3 py-2 text-[11px] text-slate-200 shadow-xl backdrop-blur-sm">
-      <div className="mb-1 uppercase tracking-[0.18em] text-slate-500">Scale</div>
-      <div className="flex items-end gap-2">
-        <div className="relative h-3">
-          <div className="absolute bottom-0 left-0 h-2 border-l border-r border-t border-cyan-300" style={{ width: `${scale.width}px` }} />
+    <div className="pointer-events-none absolute bottom-20 right-4 z-20 rounded-lg border border-white/8 bg-black/38 px-2 py-1.5 text-[10px] text-slate-300 shadow-[0_8px_24px_rgba(0,0,0,0.22)] backdrop-blur-[2px]">
+      <div className="mb-1 uppercase tracking-[0.14em] text-[9px] text-slate-500">Scale</div>
+      <div className="flex items-end gap-1.5">
+        <div className="relative h-2.5">
+          <div className="absolute bottom-0 left-0 h-1.5 border-l border-r border-t border-cyan-300/85" style={{ width: `${scale.width}px` }} />
         </div>
-        <span className="font-mono text-cyan-300">{scale.label}</span>
+        <span className="font-mono text-[10px] text-cyan-300/90">{scale.label}</span>
       </div>
     </div>
   )
 }
-
