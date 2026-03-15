@@ -709,9 +709,9 @@ export default function Dashboard() {
             <Group orientation="horizontal" className="h-full">
               <Panel
                 panelRef={leftPanelRef}
-                defaultSize={8}
-                minSize={6}
-                maxSize={12}
+                defaultSize="8%"
+                minSize="6%"
+                maxSize="12%"
                 collapsible
                 collapsedSize={0}
                 className="border-r border-[var(--panel-border)] bg-[var(--panel-bg)]"
@@ -752,7 +752,7 @@ export default function Dashboard() {
 
               <Separator className="desktop-resize-handle" />
 
-              <Panel defaultSize={64} minSize={42}>
+              <Panel defaultSize="64%" minSize="42%">
                 <div className="relative flex h-full flex-col bg-[#232323]">
                   <div className="border-b border-[var(--panel-border)] bg-[var(--panel-header)] px-4 py-2.5">
                     <div className="flex items-center justify-between">
@@ -869,9 +869,9 @@ export default function Dashboard() {
 
               <Panel
                 panelRef={rightPanelRef}
-                defaultSize={28}
-                minSize={20}
-                maxSize={36}
+                defaultSize="28%"
+                minSize="20%"
+                maxSize="36%"
                 collapsible
                 collapsedSize={0}
                 className="border-l border-[var(--panel-border)] bg-[var(--panel-bg)]"
