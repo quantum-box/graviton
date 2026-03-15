@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
+trap 'kill 0' EXIT INT TERM
+
+cd "$ROOT_DIR/backend"
+cargo run &
+
+cd "$ROOT_DIR/frontend"
+npm install
+npm run dev

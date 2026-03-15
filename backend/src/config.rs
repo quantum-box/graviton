@@ -1,5 +1,6 @@
 use std::env;
 
+#[derive(Clone)]
 pub struct Config {
     pub ais_api_key: Option<String>,
     pub opensky_client_id: Option<String>,
@@ -22,6 +23,16 @@ impl Config {
                 .filter(|s| !s.is_empty())
                 .collect(),
         }
+    }
+
+    pub fn env_status(&self) -> serde_json::Value {
+        serde_json::json!({
+            "ais_api_key": self.ais_api_key.is_some(),
+            "opensky_client_id": self.opensky_client_id.is_some(),
+            "opensky_client_secret": self.opensky_client_secret.is_some(),
+            "admin_key": self.admin_key.is_some(),
+            "cors_origins": self.cors_origins,
+        })
     }
 }
 

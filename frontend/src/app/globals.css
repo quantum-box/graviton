@@ -1,22 +1,27 @@
 @import "tailwindcss";
 
 :root {
-  --bg-primary: #1a1a2e;
-  --bg-secondary: #16213e;
-  --bg-tertiary: #0f3460;
-  --bg-surface: #1e1e3a;
-  --text-primary: #e0e0e0;
-  --text-secondary: #a0a0b0;
-  --text-accent: #00d4ff;
-  --border-color: #2a2a4a;
-  --accent-blue: #00a8ff;
-  --accent-green: #00e676;
-  --accent-red: #ff5252;
-  --accent-orange: #ff9100;
-  --accent-yellow: #ffd740;
-  --accent-purple: #7c4dff;
+  --bg-primary: #030712;
+  --bg-secondary: #07111d;
+  --bg-tertiary: #0f2234;
+  --bg-surface: #0b1724;
+  --text-primary: #e2ecf5;
+  --text-secondary: #94a3b8;
+  --text-accent: #22d3ee;
+  --border-color: #16324a;
   --toolbar-height: 38px;
   --statusbar-height: 24px;
+}
+
+:root[data-theme='day'] {
+  --bg-primary: #dce8f0;
+  --bg-secondary: #eef4f8;
+  --bg-tertiary: #c8dae7;
+  --bg-surface: #f6fbff;
+  --text-primary: #082033;
+  --text-secondary: #4b6478;
+  --text-accent: #0f766e;
+  --border-color: #9ab2c3;
 }
 
 * {
@@ -28,9 +33,11 @@ html, body {
   padding: 0;
   height: 100%;
   overflow: hidden;
-  background: var(--bg-primary);
+  background:
+    radial-gradient(circle at top, rgba(34,211,238,0.12), transparent 32%),
+    linear-gradient(180deg, rgba(10,18,28,0.96), rgba(2,6,23,1));
   color: var(--text-primary);
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+  font-family: 'IBM Plex Sans', 'Segoe UI', sans-serif;
   font-size: 13px;
   -webkit-font-smoothing: antialiased;
 }
@@ -86,3 +93,8 @@ html, body {
 .window-dot.close { background: #ff5f57; }
 .window-dot.minimize { background: #ffbd2e; }
 .window-dot.maximize { background: #28c840; }
+
+.maplibregl-ctrl-bottom-right,
+.maplibregl-ctrl-bottom-left {
+  display: none;
+}

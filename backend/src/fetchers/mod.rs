@@ -13,6 +13,18 @@ mod infrastructure;
 mod financial;
 mod space_weather;
 mod weather;
+pub mod retry;
+pub mod plane_alert;
+pub mod yacht_alert;
+pub mod military;
+pub mod carrier_tracker;
+pub mod liveuamap;
+pub mod geopolitics;
+pub mod sentinel;
+pub mod cctv;
+pub mod kiwisdr;
+pub mod radio_intercept;
+pub mod region_dossier;
 
 pub fn spawn_all(store: Arc<DataStore>) {
     // Fast tier - 60s
