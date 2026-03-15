@@ -70,7 +70,7 @@ impl DataStore {
 }
 
 fn md5_compute(data: &[u8]) -> Md5Hex {
-    use md_5::{Md5, Digest};
+    use md5::{Md5, Digest};
     let result = Md5::digest(data);
     Md5Hex(result.into())
 }

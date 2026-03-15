@@ -125,7 +125,7 @@ pub async fn fetch(store: &Arc<DataStore>) -> anyhow::Result<()> {
 fn minutes_since_epoch(elements: &sgp4::Elements, now: &chrono::DateTime<chrono::Utc>) -> f64 {
     // The sgp4 crate's Elements stores the epoch as a DateTime<Utc> via the epoch() method
     // We need to compute minutes from TLE epoch to now
-    let epoch_year = elements.epoch_afspc_compatibility_mode.0 as i32;
+    let epoch_year = elements.epoch_afspc_compatibility_mode().0 as i32;
     let epoch_year_full = if epoch_year >= 57 {
         1900 + epoch_year
     } else {
