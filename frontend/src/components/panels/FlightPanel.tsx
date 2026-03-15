@@ -2,19 +2,21 @@
 
 import { CompactList, PanelCard } from './common'
 import { getFlightOperator } from '@/utils/airlineCodes'
+import { useTranslation } from 'react-i18next'
 
 export function FlightPanel({ entity, tracked }: { entity: any; tracked: any[] }) {
   const operator = getFlightOperator(entity) || entity?.registration || entity?.model
+  const { t } = useTranslation()
 
   return (
-    <PanelCard title="Flights" subtitle="ADS-B / OpenSky / military / GPS jamming">
+    <PanelCard title={t('panels.flightsTitle')} subtitle={t('panels.flightsSubtitle')}>
       {entity?.sourceType?.includes('flight') || entity?.sourceType === 'uavs' ? (
         <div className="rounded-lg bg-black/20 p-2 text-sm">
-          <div className="font-semibold">{entity.callsign || entity.icao24 || 'Selected aircraft'}</div>
+          <div className="font-semibold">{entity.callsign || entity.icao24 || t('panels.selectedAircraft')}</div>
           <div className="text-slate-400">{operator}</div>
         </div>
       ) : (
-        <div className="text-sm text-slate-500">Select an aircraft on the map to inspect its metadata.</div>
+        <div className="text-sm text-slate-500">{t('panels.selectAircraft')}</div>
       )}
       <CompactList
         items={tracked.map((flight: any) => ({

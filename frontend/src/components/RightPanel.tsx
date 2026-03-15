@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ConflictPanel } from '@/components/panels/ConflictPanel'
 import { EarthObservationPanel } from '@/components/panels/EarthObservationPanel'
 import { FinancialPanel } from '@/components/panels/FinancialPanel'
@@ -16,12 +17,14 @@ interface RightPanelProps {
   fastData: any
   slowData: any
   focusLocation: { lat: number; lng: number; label?: string } | null
+  className?: string
 }
 
 const TABS = ['selection', 'news', 'markets', 'earth', 'conflicts', 'infra', 'geocode'] as const
 
-export function RightPanel({ selectedEntity, fastData, slowData, focusLocation }: RightPanelProps) {
+export function RightPanel({ selectedEntity, fastData, slowData, focusLocation, className = '' }: RightPanelProps) {
   const [tab, setTab] = useState<(typeof TABS)[number]>('selection')
+  const { t } = useTranslation()
 
   const celebrity = useMemo(
     () => ({
@@ -32,16 +35,16 @@ export function RightPanel({ selectedEntity, fastData, slowData, focusLocation }
   )
 
   return (
-    <aside className="flex w-[360px] shrink-0 flex-col overflow-hidden border-l border-[var(--border-color)] bg-[linear-gradient(180deg,#09131e,#081018)]">
-      <div className="grid grid-cols-4 gap-px bg-[var(--border-color)]">
+    <aside className={`flex shrink-0 flex-col overflow-hidden bg-[var(--panel-bg)] ${className}`}>
+      <div className="grid grid-cols-4 gap-px bg-[var(--panel-border)]">
         {TABS.map((item) => (
           <button
             key={item}
             onClick={() => setTab(item)}
-            className="bg-black/20 px-2 py-2 text-[11px] uppercase tracking-[0.18em] text-slate-400 hover:bg-white/5"
-            style={{ color: tab === item ? '#67e8f9' : undefined }}
+            className="bg-black/20 px-2 py-2 text-[11px] uppercase tracking-[0.18em] text-[var(--text-muted)] hover:bg-white/5"
+            style={{ color: tab === item ? 'var(--accent)' : undefined }}
           >
-            {item}
+            {t(`rightPanel.${item}`)}
           </button>
         ))}
       </div>

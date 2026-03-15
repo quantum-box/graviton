@@ -1,21 +1,18 @@
 'use client'
 
 import { History, X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 interface ChangelogModalProps {
   open: boolean
   onClose: () => void
 }
 
-const ITEMS = [
-  'Responsive drawers for sources, intel panels, and mobile utility controls.',
-  'First-run onboarding and in-app changelog access from the toolbar.',
-  'Map scale bar, airline code expansion, and isolated React error boundary fallback.',
-  'Docker, startup script, and GitHub Actions paths aligned with backend and frontend build checks.',
-]
-
 export function ChangelogModal({ open, onClose }: ChangelogModalProps) {
+  const { t } = useTranslation()
   if (!open) return null
+
+  const items = [t('changelog.item1'), t('changelog.item2'), t('changelog.item3'), t('changelog.item4')]
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
@@ -24,16 +21,16 @@ export function ChangelogModal({ open, onClose }: ChangelogModalProps) {
           <div>
             <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.28em] text-cyan-300">
               <History size={14} />
-              Changelog
+              {t('changelog.title')}
             </div>
-            <h2 className="mt-2 text-xl font-semibold text-slate-100">Current delivery</h2>
+            <h2 className="mt-2 text-xl font-semibold text-slate-100">{t('changelog.heading')}</h2>
           </div>
-          <button onClick={onClose} className="rounded-full border border-white/10 p-2 text-slate-300 hover:bg-white/5" aria-label="Close changelog">
+          <button onClick={onClose} className="rounded-full border border-white/10 p-2 text-slate-300 hover:bg-white/5" aria-label={t('changelog.closeAria')}>
             <X size={16} />
           </button>
         </div>
         <div className="space-y-3 px-6 py-5">
-          {ITEMS.map((item) => (
+          {items.map((item) => (
             <div key={item} className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-slate-300">
               {item}
             </div>
@@ -43,4 +40,3 @@ export function ChangelogModal({ open, onClose }: ChangelogModalProps) {
     </div>
   )
 }
-

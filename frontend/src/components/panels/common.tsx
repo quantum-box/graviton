@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+
 export function PanelCard({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
   return (
     <section className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
@@ -11,6 +13,12 @@ export function PanelCard({ title, subtitle, children }: { title: string; subtit
 }
 
 export function CompactList({ items }: { items: Array<{ title: string; meta?: string; href?: string }> }) {
+  const { t } = useTranslation()
+
+  if (items.length === 0) {
+    return <div className="rounded-lg bg-black/20 p-2 text-sm text-slate-500">{t('panels.noItems')}</div>
+  }
+
   return (
     <div className="space-y-2">
       {items.slice(0, 8).map((item, idx) => (

@@ -18,6 +18,8 @@ export default function MapView({
   onSelect,
   onMouseMove,
   onZoomChange,
+  onViewChange,
+  activeTool,
 }: {
   data: DashboardData
   layers: LayerVisibility
@@ -26,6 +28,8 @@ export default function MapView({
   onSelect: (entity: any) => void
   onMouseMove: (coords: { lat: number; lng: number } | null) => void
   onZoomChange: (zoom: number) => void
+  onViewChange?: (view: { lat: number; lng: number; zoom: number }) => void
+  activeTool?: string
 }) {
   const mapRef = useRef<MapRef>(null)
   const [popup, setPopup] = useState<any>(null)
@@ -73,7 +77,7 @@ export default function MapView({
   }
 
   return (
-    <div className="relative min-h-[40vh] flex-1">
+    <div className={`relative min-h-[40vh] flex-1 ${activeTool === 'measure' ? 'cursor-crosshair' : activeTool === 'marker' ? 'cursor-cell' : activeTool === 'filter' ? 'cursor-help' : 'cursor-default'}`}>
       <Map
         ref={mapRef}
         initialViewState={{ longitude: 20, latitude: 26, zoom: 2.8 }}
@@ -82,7 +86,11 @@ export default function MapView({
         onClick={handleClick}
         onMouseMove={(e) => onMouseMove({ lat: e.lngLat.lat, lng: e.lngLat.lng })}
         onZoomEnd={(e) => onZoomChange(e.viewState.zoom)}
-        onMove={(e) => setMapCenter({ lat: e.viewState.latitude, lng: e.viewState.longitude })}
+        onMove={(e) => {
+          const nextView = { lat: e.viewState.latitude, lng: e.viewState.longitude, zoom: e.viewState.zoom }
+          setMapCenter({ lat: nextView.lat, lng: nextView.lng })
+          onViewChange?.(nextView)
+        }}
       >
         {layers.weather_radar && data.slowData?.weather && (data.slowData.weather as any).host && (data.slowData.weather as any).radar_tile_path && (
           <Source

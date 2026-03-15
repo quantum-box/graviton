@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 import { ThemeProvider } from '@/lib/ThemeContext'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
+import { I18nProvider } from '@/components/I18nProvider'
 
 export const metadata: Metadata = {
   title: 'Graviton — Geospatial Intelligence',
@@ -16,9 +17,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased">
-        <ThemeProvider>
-          <ErrorBoundary fallbackTitle="Application Shell">{children}</ErrorBoundary>
-        </ThemeProvider>
+        <I18nProvider>
+          <ThemeProvider>
+            <ErrorBoundary fallbackTitle="Application Shell">{children}</ErrorBoundary>
+          </ThemeProvider>
+        </I18nProvider>
       </body>
     </html>
   )

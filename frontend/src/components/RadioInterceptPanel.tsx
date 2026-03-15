@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from 'react'
 import type { FocusLocation } from '@/types/dashboard'
+import { useTranslation } from 'react-i18next'
 
 export function RadioInterceptPanel({ location }: { location: FocusLocation | null }) {
   const [topFeeds, setTopFeeds] = useState<any[]>([])
   const [nearestFeeds, setNearestFeeds] = useState<any[]>([])
+  const { t } = useTranslation()
 
   useEffect(() => {
     fetch('/api/radio/top')
@@ -24,7 +26,7 @@ export function RadioInterceptPanel({ location }: { location: FocusLocation | nu
 
   return (
     <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
-      <div className="mb-2 text-[11px] uppercase tracking-[0.2em] text-cyan-300">Radio Intercept</div>
+      <div className="mb-2 text-[11px] uppercase tracking-[0.2em] text-cyan-300">{t('radio.title')}</div>
       <div className="space-y-2">
         {(location ? nearestFeeds : topFeeds).slice(0, 6).map((feed: any, index) => (
           <a
@@ -33,12 +35,11 @@ export function RadioInterceptPanel({ location }: { location: FocusLocation | nu
             target="_blank"
             className="block rounded-xl bg-black/20 p-2 text-sm text-slate-100 hover:text-cyan-300"
           >
-            <div>{feed.name || feed.shortName || 'Scanner feed'}</div>
-            <div className="text-xs text-slate-500">{feed.location || feed.countyName || feed.category || 'OpenMHz / Broadcastify'}</div>
+            <div>{feed.name || feed.shortName || t('radio.defaultName')}</div>
+            <div className="text-xs text-slate-500">{feed.location || feed.countyName || feed.category || t('radio.defaultMeta')}</div>
           </a>
         ))}
       </div>
     </section>
   )
 }
-

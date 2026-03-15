@@ -4,6 +4,7 @@ import { SlidersHorizontal } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { AdvancedFilterModal } from '@/components/AdvancedFilterModal'
 import type { DashboardData } from '@/types/dashboard'
+import { useTranslation } from 'react-i18next'
 
 export interface FilterState {
   militaryTypes: string[]
@@ -21,6 +22,7 @@ export function FilterPanel({
   onChange: (filters: FilterState) => void
 }) {
   const [modal, setModal] = useState<null | keyof FilterState>(null)
+  const { t } = useTranslation()
 
   const options = useMemo(
     () => ({
@@ -38,9 +40,9 @@ export function FilterPanel({
   )
 
   const config = {
-    militaryTypes: 'Military Types',
-    trackedCategories: 'PlaneAlert Categories',
-    yachtCategories: 'YachtAlert Categories',
+    militaryTypes: t('filters.militaryTypes'),
+    trackedCategories: t('filters.trackedCategories'),
+    yachtCategories: t('filters.yachtCategories'),
   }
 
   return (
@@ -48,7 +50,7 @@ export function FilterPanel({
       <div className="rounded-2xl border border-white/10 bg-black/45 p-3 backdrop-blur-md">
         <div className="mb-3 flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-cyan-300">
           <SlidersHorizontal size={14} />
-          Filters
+          {t('filters.title')}
         </div>
         <div className="space-y-2">
           {(Object.keys(config) as Array<keyof FilterState>).map((key) => (
@@ -58,7 +60,7 @@ export function FilterPanel({
               className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-left text-sm text-slate-200 hover:bg-white/8"
             >
               <span>{config[key]}</span>
-              <span className="text-xs text-slate-500">{filters[key].length || 'All'}</span>
+              <span className="text-xs text-slate-500">{filters[key].length || t('filters.all')}</span>
             </button>
           ))}
         </div>
@@ -77,4 +79,3 @@ export function FilterPanel({
     </>
   )
 }
-

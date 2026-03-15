@@ -1,5 +1,7 @@
 'use client'
 
+import { useTranslation } from 'react-i18next'
+
 interface AdvancedFilterModalProps {
   open: boolean
   title: string
@@ -10,6 +12,7 @@ interface AdvancedFilterModalProps {
 }
 
 export function AdvancedFilterModal({ open, title, options, selected, onClose, onChange }: AdvancedFilterModalProps) {
+  const { t } = useTranslation()
   if (!open) return null
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
@@ -17,7 +20,7 @@ export function AdvancedFilterModal({ open, title, options, selected, onClose, o
         <div className="mb-3 flex items-center justify-between">
           <div className="text-sm font-semibold tracking-[0.18em] text-cyan-300 uppercase">{title}</div>
           <button onClick={onClose} className="rounded-full border border-white/10 px-3 py-1 text-xs text-slate-300">
-            Close
+            {t('filters.close')}
           </button>
         </div>
         <div className="grid max-h-[50vh] grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2">
@@ -42,4 +45,3 @@ export function AdvancedFilterModal({ open, title, options, selected, onClose, o
     </div>
   )
 }
-

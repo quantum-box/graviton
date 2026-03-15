@@ -3,17 +3,19 @@
 import { Search, MapPinned } from 'lucide-react'
 import { useState } from 'react'
 import type { FocusLocation } from '@/types/dashboard'
+import { useTranslation } from 'react-i18next'
 
 export function FindLocateBar({ onSelect }: { onSelect: (location: FocusLocation) => void }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<FocusLocation[]>([])
   const [loading, setLoading] = useState(false)
+  const { t } = useTranslation()
 
   async function handleSearch(value: string) {
     setQuery(value)
     const coordMatch = value.trim().match(/^([+-]?\d+\.?\d*)[,\s]+([+-]?\d+\.?\d*)$/)
     if (coordMatch) {
-      setResults([{ lat: Number(coordMatch[1]), lng: Number(coordMatch[2]), label: 'Coordinates' }])
+      setResults([{ lat: Number(coordMatch[1]), lng: Number(coordMatch[2]), label: t('search.coordinates') }])
       return
     }
     if (value.trim().length < 2) {
@@ -43,7 +45,7 @@ export function FindLocateBar({ onSelect }: { onSelect: (location: FocusLocation
         <input
           value={query}
           onChange={(e) => handleSearch(e.target.value)}
-          placeholder="Search coordinates, cities, ports, airbases, conflict zones"
+          placeholder={t('search.placeholder')}
           className="w-full bg-transparent text-sm text-slate-100 outline-none placeholder:text-slate-500"
         />
         {loading && <div className="h-3 w-3 animate-spin rounded-full border border-cyan-300 border-t-transparent" />}
@@ -68,4 +70,3 @@ export function FindLocateBar({ onSelect }: { onSelect: (location: FocusLocation
     </div>
   )
 }
-

@@ -2,6 +2,7 @@
 
 import { AlertTriangle } from 'lucide-react'
 import { Component, type ErrorInfo, type ReactNode } from 'react'
+import i18n from '@/lib/i18n'
 
 interface ErrorBoundaryProps {
   children: ReactNode
@@ -33,15 +34,14 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
         <div className="max-w-md rounded-3xl border border-amber-500/30 bg-[#1a140a]/90 p-5 text-sm text-amber-50 shadow-2xl">
           <div className="mb-2 flex items-center gap-2 text-[11px] uppercase tracking-[0.24em] text-amber-300">
             <AlertTriangle size={14} />
-            {this.props.fallbackTitle ?? 'Interface Fault'}
+            {this.props.fallbackTitle ?? i18n.t('errorBoundary.defaultTitle')}
           </div>
-          <div className="text-base font-semibold">A panel crashed.</div>
+          <div className="text-base font-semibold">{i18n.t('errorBoundary.panelCrashed')}</div>
           <p className="mt-2 text-amber-100/80">
-            Reload the page if this persists. The rest of the dashboard remains isolated.
+            {i18n.t('errorBoundary.reload')}
           </p>
         </div>
       </div>
     )
   }
 }
-

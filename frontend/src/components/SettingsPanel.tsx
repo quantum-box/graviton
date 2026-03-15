@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 interface FeedConfig {
   name: string
@@ -12,6 +13,7 @@ export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () =>
   const [adminKey, setAdminKey] = useState('')
   const [feeds, setFeeds] = useState<FeedConfig[]>([])
   const [apiKeys, setApiKeys] = useState<Record<string, string>>({})
+  const { t } = useTranslation()
 
   useEffect(() => {
     if (!open) return
@@ -43,19 +45,19 @@ export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () =>
     <div className="fixed inset-0 z-50 flex justify-end bg-black/60">
       <div className="flex h-full w-full max-w-xl flex-col border-l border-white/10 bg-[#07101a] p-4 shadow-2xl">
         <div className="mb-4 flex items-center justify-between">
-          <div className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-300">Settings</div>
+          <div className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-300">{t('settings.title')}</div>
           <button onClick={onClose} className="rounded-full border border-white/10 px-3 py-1 text-xs text-slate-300">
-            Close
+            {t('settings.close')}
           </button>
         </div>
         <input
           value={adminKey}
           onChange={(e) => setAdminKey(e.target.value)}
-          placeholder="Admin key for protected settings"
+          placeholder={t('settings.adminPlaceholder')}
           className="mb-4 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none"
         />
         <div className="mb-4">
-          <div className="mb-2 text-xs uppercase tracking-[0.18em] text-slate-400">RSS Feeds</div>
+          <div className="mb-2 text-xs uppercase tracking-[0.18em] text-slate-400">{t('settings.rssFeeds')}</div>
           <div className="space-y-2">
             {feeds.map((feed, index) => (
               <div key={`${feed.name}-${index}`} className="grid grid-cols-1 gap-2 rounded-2xl border border-white/10 bg-white/5 p-3">
@@ -65,11 +67,11 @@ export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () =>
             ))}
           </div>
           <button onClick={saveFeeds} className="mt-3 rounded-2xl bg-cyan-500/20 px-4 py-2 text-sm text-cyan-200">
-            Save Feeds
+            {t('settings.saveFeeds')}
           </button>
         </div>
         <div>
-          <div className="mb-2 text-xs uppercase tracking-[0.18em] text-slate-400">API Keys</div>
+          <div className="mb-2 text-xs uppercase tracking-[0.18em] text-slate-400">{t('settings.apiKeys')}</div>
           <div className="space-y-2">
             {['AIS_API_KEY', 'OPENSKY_CLIENT_ID', 'OPENSKY_CLIENT_SECRET'].map((key) => (
               <input
@@ -82,11 +84,10 @@ export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () =>
             ))}
           </div>
           <button onClick={saveKeys} className="mt-3 rounded-2xl bg-cyan-500/20 px-4 py-2 text-sm text-cyan-200">
-            Save Keys
+            {t('settings.saveKeys')}
           </button>
         </div>
       </div>
     </div>
   )
 }
-
