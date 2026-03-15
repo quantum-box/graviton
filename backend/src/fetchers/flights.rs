@@ -64,12 +64,14 @@ pub async fn fetch(store: &Arc<DataStore>) -> anyhow::Result<()> {
     }
 
     let opensky = fetch_opensky(&client).await.unwrap_or_default();
-    for aircraft in opensky {
-        if let Some(item) = normalize_aircraft(&aircraft, "opensky") {
-            if plane_alert::is_tracked(&item) {
-                tracked.push(plane_alert::enrich_tracked(item.clone()));
-            }
-            commercial.push(item);
+    for item in opensky {
+        if plane_alert::is_tracked(&item) {
+            tracked.push(plane_alert::enrich_tracked(item.clone()));
+        }
+        match item.get("type").and_then(Value::as_str).unwrap_or("commercial_flight") {
+            "commercial_flight" => commercial.push(item),
+            "private_flight" => private_flights.push(item),
+            _ => commercial.push(item),
         }
     }
 
@@ -237,24 +239,34 @@ async fn fetch_opensky(client: &reqwest::Client) -> anyhow::Result<Vec<Value>> {
     let data: Value = resp.json().await?;
     let mut out = Vec::new();
     if let Some(states) = data.get("states").and_then(Value::as_array) {
-        for state in states.iter().take(250) {
+        for state in states.iter().take(1500) {
             let Some(arr) = state.as_array() else { continue };
-            let (Some(icao), Some(callsign), Some(lng), Some(lat)) = (
+            let (Some(icao), Some(lng), Some(lat)) = (
                 arr.first().and_then(Value::as_str),
-                arr.get(1).and_then(Value::as_str),
                 arr.get(5).and_then(Value::as_f64),
                 arr.get(6).and_then(Value::as_f64),
             ) else {
                 continue;
             };
+            let callsign = arr.get(1).and_then(Value::as_str).map(str::trim).unwrap_or("");
+            let country = arr.get(2).and_then(Value::as_str);
+            let velocity_ms = arr.get(9).and_then(Value::as_f64);
+            let model = arr.get(8).and_then(Value::as_bool).filter(|on_ground| *on_ground).map(|_| "GROUND");
+            let kind = if callsign.len() >= 3 { "commercial_flight" } else { "private_flight" };
             out.push(json!({
-                "hex": icao,
-                "flight": callsign.trim(),
-                "lon": lng,
-                "lat": lat,
-                "alt_baro": arr.get(7).and_then(Value::as_f64),
-                "track": arr.get(10).and_then(Value::as_f64),
-                "gs": arr.get(9).and_then(Value::as_f64).map(|v| v * 1.94384),
+                "icao24": icao.trim().to_uppercase(),
+                "callsign": if callsign.is_empty() { Value::Null } else { json!(callsign) },
+                "lat": round5(lat),
+                "lng": round5(lng),
+                "alt": arr.get(7).and_then(Value::as_f64).map(|value| value * 3.28084),
+                "heading": arr.get(10).and_then(Value::as_f64),
+                "speed_knots": velocity_ms.map(|value| value * 1.94384),
+                "country": country,
+                "source": "opensky",
+                "on_ground": arr.get(8).and_then(Value::as_bool),
+                "squawk": arr.get(14).and_then(Value::as_str),
+                "model": model,
+                "type": kind,
             }));
         }
     }

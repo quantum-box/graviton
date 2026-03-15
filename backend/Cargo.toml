@@ -35,3 +35,4 @@ redis = { version = "0.27", features = ["tokio-comp", "connection-manager", "jso
 jsonwebtoken = "9"
 sha2 = "0.10"
 base64 = "0.22"
+zip = { version = "0.6", default-features = false, features = ["deflate"] }

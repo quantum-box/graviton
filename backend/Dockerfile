@@ -12,6 +12,9 @@ RUN touch src/main.rs && cargo build --release
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y ca-certificates curl && rm -rf /var/lib/apt/lists/*
 
+WORKDIR /app
+COPY data/ /app/data/
+COPY config/ /app/config/
 COPY --from=builder /app/target/release/graviton-backend /usr/local/bin/graviton-backend
 
 EXPOSE 8000
