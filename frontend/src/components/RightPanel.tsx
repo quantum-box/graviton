@@ -11,6 +11,7 @@ import { InfrastructurePanel } from '@/components/panels/InfrastructurePanel'
 import { NewsPanel } from '@/components/panels/NewsPanel'
 import { SatellitePanel } from '@/components/panels/SatellitePanel'
 import { ShipPanel } from '@/components/panels/ShipPanel'
+import { SelectedFeatureDetails } from '@/components/selection/SelectedFeatureDetails'
 
 interface RightPanelProps {
   selectedEntity: any
@@ -25,6 +26,10 @@ const TABS = ['selection', 'news', 'markets', 'earth', 'conflicts', 'infra', 'ge
 export function RightPanel({ selectedEntity, fastData, slowData, focusLocation, className = '' }: RightPanelProps) {
   const [tab, setTab] = useState<(typeof TABS)[number]>('selection')
   const { t } = useTranslation()
+  const sourceType = selectedEntity?.sourceType
+  const isFlight = typeof sourceType === 'string' && (sourceType.includes('flight') || sourceType === 'uavs')
+  const isShip = sourceType === 'ships'
+  const isSatellite = sourceType === 'satellites'
 
   const celebrity = useMemo(
     () => ({
@@ -52,9 +57,10 @@ export function RightPanel({ selectedEntity, fastData, slowData, focusLocation, 
       <div className="flex-1 overflow-y-auto p-3">
         {tab === 'selection' && (
           <div className="space-y-3">
-            <FlightPanel entity={selectedEntity} tracked={celebrity.trackedFlights} />
-            <ShipPanel entity={selectedEntity} ships={fastData?.ships ?? []} />
-            <SatellitePanel entity={selectedEntity} satellites={fastData?.satellites ?? []} />
+            <SelectedFeatureDetails entity={selectedEntity} />
+            {(isFlight || !selectedEntity) && <FlightPanel entity={selectedEntity} tracked={celebrity.trackedFlights} />}
+            {(isShip || !selectedEntity) && <ShipPanel entity={selectedEntity} ships={fastData?.ships ?? []} />}
+            {(isSatellite || !selectedEntity) && <SatellitePanel entity={selectedEntity} satellites={fastData?.satellites ?? []} />}
           </div>
         )}
         {tab === 'news' && <NewsPanel news={slowData?.news ?? []} gdelt={slowData?.gdelt ?? []} />}

@@ -56,23 +56,26 @@ body {
 
 /* MapLibre popup customization */
 .maplibregl-popup-content {
-  background: var(--bg-surface) !important;
+  background:
+    linear-gradient(180deg, rgba(8, 18, 30, 0.98), rgba(4, 10, 20, 0.98)) !important;
   color: var(--text-primary) !important;
-  border: 1px solid var(--border-color) !important;
-  border-radius: 8px !important;
-  padding: 12px !important;
+  border: 1px solid rgba(148, 163, 184, 0.18) !important;
+  border-radius: 18px !important;
+  padding: 14px !important;
   font-size: 12px !important;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.5) !important;
-  max-width: 320px !important;
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.52) !important;
+  max-width: 340px !important;
 }
 
 .maplibregl-popup-tip {
-  border-top-color: var(--bg-surface) !important;
+  border-top-color: rgba(4, 10, 20, 0.98) !important;
 }
 
 .maplibregl-popup-close-button {
   color: var(--text-secondary) !important;
-  font-size: 16px !important;
+  font-size: 18px !important;
+  right: 10px !important;
+  top: 8px !important;
 }
 
 /* Custom scrollbar */

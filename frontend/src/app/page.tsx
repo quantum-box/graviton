@@ -41,6 +41,51 @@ import { DashboardDataProvider } from '@/lib/DashboardDataContext'
 
 const MapView = dynamic(() => import('@/components/MapView'), { ssr: false })
 
+function extractFlightRoute(payload: any): { routeOrigin?: string; routeDestination?: string } | null {
+  const candidates = [
+    payload,
+    payload?.response,
+    payload?.response?.flights?.[0],
+    payload?.response?.route?.[0],
+    payload?.route?.[0],
+    Array.isArray(payload) ? payload[0] : null,
+  ].filter(Boolean)
+
+  for (const candidate of candidates) {
+    const iata = Array.isArray(candidate?.airport_codes_iata) ? candidate.airport_codes_iata : null
+    const icao = Array.isArray(candidate?.airport_codes_icao) ? candidate.airport_codes_icao : null
+    const airports = Array.isArray(candidate?.airports) ? candidate.airports : null
+    const fallbackRoute = Array.isArray(candidate?.route) ? candidate.route : null
+
+    const origin =
+      airports?.[0]?.name ??
+      airports?.[0]?.municipality ??
+      airports?.[0]?.icao ??
+      airports?.[0]?.iata ??
+      iata?.[0] ??
+      icao?.[0] ??
+      fallbackRoute?.[0]
+
+    const destination =
+      airports?.[1]?.name ??
+      airports?.[1]?.municipality ??
+      airports?.[1]?.icao ??
+      airports?.[1]?.iata ??
+      iata?.[1] ??
+      icao?.[1] ??
+      fallbackRoute?.[1]
+
+    if (origin || destination) {
+      return {
+        routeOrigin: typeof origin === 'string' ? origin : undefined,
+        routeDestination: typeof destination === 'string' ? destination : undefined,
+      }
+    }
+  }
+
+  return null
+}
+
 export interface LayerVisibility {
   commercial_flights: boolean
   private_flights: boolean
@@ -455,6 +500,29 @@ export default function Dashboard() {
   }, [selectedEntity])
 
   useEffect(() => {
+    const callsign = typeof selectedEntity?.callsign === 'string' ? selectedEntity.callsign.trim() : ''
+    const sourceType = typeof selectedEntity?.sourceType === 'string' ? selectedEntity.sourceType : ''
+    if (!callsign || (!sourceType.includes('flight') && sourceType !== 'uavs')) return
+    if (selectedEntity?.routeOrigin || selectedEntity?.routeDestination) return
+
+    const controller = new AbortController()
+
+    fetch(`/api/route/${encodeURIComponent(callsign)}`, { signal: controller.signal })
+      .then((resp) => (resp.ok ? resp.json() : null))
+      .then((payload) => {
+        const route = extractFlightRoute(payload)
+        if (!route) return
+        setSelectedEntity((current: any) => {
+          if (!current || current.callsign !== callsign) return current
+          return { ...current, ...route }
+        })
+      })
+      .catch(() => {})
+
+    return () => controller.abort()
+  }, [selectedEntity?.callsign, selectedEntity?.routeDestination, selectedEntity?.routeOrigin, selectedEntity?.sourceType])
+
+  useEffect(() => {
     if (mobileSheet) setLastMobileSheet(mobileSheet)
   }, [mobileSheet])
 
@@ -623,7 +691,12 @@ export default function Dashboard() {
             layers={layers}
             zoom={zoom}
             focusLocation={focusLocation}
+            selectedFeature={selectedEntity}
             onSelect={setSelectedEntity}
+            onClearSelection={() => {
+              setSelectedEntity(null)
+              setRightPanelOpen(false)
+            }}
             onMouseMove={setMouseCoords}
             onZoomChange={setZoom}
             trajectory={trajectory}
