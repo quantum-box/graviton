@@ -1,0 +1,88 @@
+@import "tailwindcss";
+
+:root {
+  --bg-primary: #1a1a2e;
+  --bg-secondary: #16213e;
+  --bg-tertiary: #0f3460;
+  --bg-surface: #1e1e3a;
+  --text-primary: #e0e0e0;
+  --text-secondary: #a0a0b0;
+  --text-accent: #00d4ff;
+  --border-color: #2a2a4a;
+  --accent-blue: #00a8ff;
+  --accent-green: #00e676;
+  --accent-red: #ff5252;
+  --accent-orange: #ff9100;
+  --accent-yellow: #ffd740;
+  --accent-purple: #7c4dff;
+  --toolbar-height: 38px;
+  --statusbar-height: 24px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* MapLibre popup customization */
+.maplibregl-popup-content {
+  background: var(--bg-surface) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 8px !important;
+  padding: 12px !important;
+  font-size: 12px !important;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5) !important;
+  max-width: 320px !important;
+}
+
+.maplibregl-popup-tip {
+  border-top-color: var(--bg-surface) !important;
+}
+
+.maplibregl-popup-close-button {
+  color: var(--text-secondary) !important;
+  font-size: 16px !important;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3a3a5a;
+}
+
+/* Mac-style window chrome */
+.window-controls {
+  display: flex;
+  gap: 6px;
+  padding: 0 8px;
+}
+.window-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.window-dot.close { background: #ff5f57; }
+.window-dot.minimize { background: #ffbd2e; }
+.window-dot.maximize { background: #28c840; }
