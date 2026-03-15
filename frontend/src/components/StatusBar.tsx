@@ -10,22 +10,16 @@ interface StatusBarProps {
   statusLabel?: string
 }
 
-export function StatusBar({ coords, zoom, counts, spaceWeather, statusLabel = 'LIVE' }: StatusBarProps) {
-  const flights = (counts.commercial_flights ?? 0) + (counts.private_flights ?? 0) + (counts.private_jets ?? 0) + (counts.military_flights ?? 0)
+export function StatusBar({ coords, zoom, statusLabel = 'LIVE' }: StatusBarProps) {
   const { t } = useTranslation()
 
   return (
-    <div className="flex h-[var(--statusbar-height)] items-center justify-between gap-3 border-t border-[var(--panel-border)] bg-[var(--chrome-bg)] px-3 font-mono text-[11px] text-[var(--text-secondary)]">
-      <div>
-        {(coords
-          ? t('status.latlng', { lat: coords.lat.toFixed(3), lng: coords.lng.toFixed(3) })
-          : t('status.latlngEmpty'))}{' '}
-        | {t('status.zoom', { zoom: zoom.toFixed(2) })} | {statusLabel}
+    <div className="pointer-events-auto flex h-[var(--statusbar-height)] items-center justify-between gap-3 rounded-full border border-white/10 bg-[rgba(7,14,24,0.76)] px-3 font-mono text-[11px] text-slate-300 shadow-[0_12px_36px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+      <div className="truncate">
+        {coords ? t('status.latlng', { lat: coords.lat.toFixed(3), lng: coords.lng.toFixed(3) }) : t('status.latlngEmpty')}
       </div>
-      <div className="hidden lg:block">
-        {t('status.flights', { count: flights })} | {t('status.ships', { count: counts.ships ?? 0 })} | {t('status.sats', { count: counts.satellites ?? 0 })} |{' '}
-        {t('status.kp', { value: spaceWeather?.kp_index ?? '-' })}
-      </div>
+      <div className="shrink-0">{t('status.zoom', { zoom: zoom.toFixed(2) })}</div>
+      {statusLabel && <div className="hidden truncate text-slate-400 md:block">{statusLabel}</div>}
     </div>
   )
 }

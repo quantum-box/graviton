@@ -39,10 +39,10 @@ export function LeftPanel({ layers, counts, onToggle, className = '' }: LeftPane
   const { t } = useTranslation()
 
   return (
-    <aside className={`shrink-0 overflow-y-auto border-r border-[var(--panel-border)] bg-[var(--panel-bg)] ${className}`}>
-      <div className="p-3">
-        <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-muted)]">{t('layers.dataSources')}</div>
-        <div className="space-y-1.5">
+    <aside className={`shrink-0 overflow-y-auto ${className}`}>
+      <div className="space-y-2">
+        <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-muted)]">{t('layers.dataSources')}</div>
+        <div className="space-y-2">
           {LAYERS.map(({ key, icon: Icon, color }) => {
             const active = layers[key]
             const count = counts[key] ?? 0
@@ -50,12 +50,26 @@ export function LeftPanel({ layers, counts, onToggle, className = '' }: LeftPane
               <button
                 key={key}
                 onClick={() => onToggle(key)}
-                className="flex w-full items-center gap-2 rounded-md border border-transparent px-2 py-2 text-left transition hover:border-white/8 hover:bg-white/5"
-                style={{ opacity: active ? 1 : 0.45, background: active ? 'rgba(255,255,255,0.05)' : undefined }}
+                className="flex w-full items-center gap-3 rounded-2xl border px-3 py-3 text-left transition"
+                style={{
+                  opacity: active ? 1 : 0.6,
+                  borderColor: active ? 'rgba(94,234,212,0.22)' : 'rgba(255,255,255,0.08)',
+                  background: active ? 'rgba(45,212,191,0.12)' : 'rgba(255,255,255,0.04)',
+                }}
               >
-                <Icon size={15} style={{ color }} />
-                <span className="flex-1 text-sm text-[var(--text-primary)]">{t(`layers.${key}`)}</span>
-                <span className="rounded bg-black/25 px-1.5 py-0.5 font-mono text-[11px] text-[var(--text-secondary)]">{count}</span>
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-black/25">
+                  <Icon size={16} style={{ color }} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm text-[var(--text-primary)]">{t(`layers.${key}`)}</div>
+                  <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-muted)]">{count} items</div>
+                </div>
+                <div
+                  className={`flex h-6 w-11 shrink-0 items-center rounded-full p-1 transition ${active ? 'justify-end bg-teal-400/80' : 'justify-start bg-white/10'}`}
+                  aria-hidden="true"
+                >
+                  <span className="h-4 w-4 rounded-full bg-white shadow-sm" />
+                </div>
               </button>
             )
           })}
