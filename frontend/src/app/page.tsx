@@ -1,8 +1,8 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
-import { Menu, Settings2, X } from 'lucide-react'
+import { BookOpen, Menu, PanelLeftClose, PanelRightClose, Settings2, Sparkles, X } from 'lucide-react'
 import { LeftPanel } from '@/components/LeftPanel'
 import { RightPanel } from '@/components/RightPanel'
 import { StatusBar } from '@/components/StatusBar'
@@ -14,6 +14,9 @@ import { SettingsPanel } from '@/components/SettingsPanel'
 import { RadioInterceptPanel } from '@/components/RadioInterceptPanel'
 import { useDataPolling } from '@/hooks/useDataPolling'
 import { DashboardDataProvider } from '@/lib/DashboardDataContext'
+import { OnboardingModal } from '@/components/OnboardingModal'
+import { ChangelogModal } from '@/components/ChangelogModal'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 
 const MapView = dynamic(() => import('@/components/MapView'), { ssr: false })
 
@@ -75,7 +78,11 @@ export default function Dashboard() {
   const [leftOpen, setLeftOpen] = useState(true)
   const [rightOpen, setRightOpen] = useState(true)
   const [mobileMenu, setMobileMenu] = useState(false)
+  const [mobileLeftOpen, setMobileLeftOpen] = useState(false)
+  const [mobileRightOpen, setMobileRightOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [onboardingOpen, setOnboardingOpen] = useState(false)
+  const [changelogOpen, setChangelogOpen] = useState(false)
   const [layers, setLayers] = useState<LayerVisibility>(DEFAULT_LAYERS)
   const [selectedEntity, setSelectedEntity] = useState<any>(null)
   const [mouseCoords, setMouseCoords] = useState<{ lat: number; lng: number } | null>(null)
@@ -130,6 +137,24 @@ export default function Dashboard() {
 
   const dashboardData = { fastData: filteredFastData, slowData }
 
+  useEffect(() => {
+    const seen = window.localStorage.getItem('graviton-onboarding-seen')
+    if (!seen) {
+      setOnboardingOpen(true)
+      window.localStorage.setItem('graviton-onboarding-seen', 'true')
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!mobileLeftOpen) return
+    setMobileRightOpen(false)
+  }, [mobileLeftOpen])
+
+  useEffect(() => {
+    if (!mobileRightOpen) return
+    setMobileLeftOpen(false)
+  }, [mobileRightOpen])
+
   return (
     <DashboardDataProvider fastData={filteredFastData} slowData={slowData} selectedEntity={selectedEntity} setSelectedEntity={setSelectedEntity}>
       <div className="flex h-screen w-screen flex-col overflow-hidden bg-[var(--bg-primary)] text-[var(--text-primary)]">
@@ -140,6 +165,8 @@ export default function Dashboard() {
           onToggleRight={() => setRightOpen((v) => !v)}
           onSearchSelect={setFocusLocation}
           isLoading={isLoading}
+          onOpenOnboarding={() => setOnboardingOpen(true)}
+          onOpenChangelog={() => setChangelogOpen(true)}
         />
 
         <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-black/25 px-3 py-2 md:hidden">
@@ -151,6 +178,25 @@ export default function Dashboard() {
           </div>
           <button onClick={() => setSettingsOpen(true)} className="rounded-xl border border-white/10 p-2 text-slate-200">
             <Settings2 size={16} />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-4 gap-px border-b border-white/10 bg-[#060d15] md:hidden">
+          <button onClick={() => setMobileLeftOpen((v) => !v)} className="flex items-center justify-center gap-2 px-3 py-2 text-[11px] uppercase tracking-[0.18em] text-slate-300">
+            <PanelLeftClose size={14} />
+            Sources
+          </button>
+          <button onClick={() => setMobileRightOpen((v) => !v)} className="flex items-center justify-center gap-2 px-3 py-2 text-[11px] uppercase tracking-[0.18em] text-slate-300">
+            <PanelRightClose size={14} />
+            Intel
+          </button>
+          <button onClick={() => setOnboardingOpen(true)} className="flex items-center justify-center gap-2 px-3 py-2 text-[11px] uppercase tracking-[0.18em] text-slate-300">
+            <Sparkles size={14} />
+            Guide
+          </button>
+          <button onClick={() => setChangelogOpen(true)} className="flex items-center justify-center gap-2 px-3 py-2 text-[11px] uppercase tracking-[0.18em] text-slate-300">
+            <BookOpen size={14} />
+            Notes
           </button>
         </div>
 
@@ -181,22 +227,57 @@ export default function Dashboard() {
             <LeftPanel layers={layers} counts={counts} onToggle={(key) => setLayers((prev) => ({ ...prev, [key]: !prev[key] }))} />
           </div>
 
-          <MapView
-            data={dashboardData}
-            layers={layers}
-            focusLocation={focusLocation}
-            onSelect={setSelectedEntity}
-            onMouseMove={setMouseCoords}
-            onZoomChange={setZoom}
-          />
+          <ErrorBoundary fallbackTitle="Map Subsystem">
+            <MapView
+              data={dashboardData}
+              layers={layers}
+              zoom={zoom}
+              focusLocation={focusLocation}
+              onSelect={setSelectedEntity}
+              onMouseMove={setMouseCoords}
+              onZoomChange={setZoom}
+            />
+          </ErrorBoundary>
 
           <div className={`${rightOpen ? 'hidden xl:block' : 'hidden'} shrink-0`}>
-            <RightPanel selectedEntity={selectedEntity} fastData={filteredFastData} slowData={slowData} focusLocation={focusLocation} />
+            <ErrorBoundary fallbackTitle="Intel Panel">
+              <RightPanel selectedEntity={selectedEntity} fastData={filteredFastData} slowData={slowData} focusLocation={focusLocation} />
+            </ErrorBoundary>
           </div>
         </div>
 
         <StatusBar coords={mouseCoords} zoom={zoom} counts={counts} spaceWeather={slowData?.space_weather} />
         <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+        <OnboardingModal open={onboardingOpen} onClose={() => setOnboardingOpen(false)} />
+        <ChangelogModal open={changelogOpen} onClose={() => setChangelogOpen(false)} />
+
+        {mobileLeftOpen && (
+          <div className="fixed inset-y-0 left-0 z-[60] w-[88vw] max-w-[320px] border-r border-white/10 bg-[#07111b] shadow-2xl md:hidden">
+            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+              <div className="text-[11px] uppercase tracking-[0.24em] text-cyan-300">Sources</div>
+              <button onClick={() => setMobileLeftOpen(false)} className="rounded-full border border-white/10 p-2 text-slate-300">
+                <X size={14} />
+              </button>
+            </div>
+            <LeftPanel layers={layers} counts={counts} onToggle={(key) => setLayers((prev) => ({ ...prev, [key]: !prev[key] }))} />
+          </div>
+        )}
+
+        {mobileRightOpen && (
+          <div className="fixed inset-y-0 right-0 z-[60] w-[92vw] max-w-[360px] border-l border-white/10 bg-[#07111b] shadow-2xl md:hidden">
+            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+              <div className="text-[11px] uppercase tracking-[0.24em] text-cyan-300">Intel</div>
+              <button onClick={() => setMobileRightOpen(false)} className="rounded-full border border-white/10 p-2 text-slate-300">
+                <X size={14} />
+              </button>
+            </div>
+            <ErrorBoundary fallbackTitle="Intel Panel">
+              <RightPanel selectedEntity={selectedEntity} fastData={filteredFastData} slowData={slowData} focusLocation={focusLocation} />
+            </ErrorBoundary>
+          </div>
+        )}
+
+        {(mobileLeftOpen || mobileRightOpen) && <button className="fixed inset-0 z-50 bg-black/45 md:hidden" onClick={() => { setMobileLeftOpen(false); setMobileRightOpen(false) }} aria-label="Close mobile panel" />}
       </div>
     </DashboardDataProvider>
   )

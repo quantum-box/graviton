@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Globe, Loader2, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Search } from 'lucide-react'
+import { BookOpen, Globe, Loader2, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Search, Sparkles } from 'lucide-react'
 
 interface ToolbarProps {
   leftOpen: boolean
@@ -10,9 +10,11 @@ interface ToolbarProps {
   onToggleRight: () => void
   onSearchSelect: (result: { lat: number; lng: number; label?: string } | null) => void
   isLoading: boolean
+  onOpenOnboarding: () => void
+  onOpenChangelog: () => void
 }
 
-export function Toolbar({ leftOpen, rightOpen, onToggleLeft, onToggleRight, onSearchSelect, isLoading }: ToolbarProps) {
+export function Toolbar({ leftOpen, rightOpen, onToggleLeft, onToggleRight, onSearchSelect, isLoading, onOpenOnboarding, onOpenChangelog }: ToolbarProps) {
   const [time, setTime] = useState('')
   const [query, setQuery] = useState('')
   const [searching, setSearching] = useState(false)
@@ -57,7 +59,7 @@ export function Toolbar({ leftOpen, rightOpen, onToggleLeft, onToggleRight, onSe
         </div>
       </div>
 
-      <form onSubmit={handleSearch} className="flex min-w-0 max-w-xl flex-1 items-center gap-2">
+      <form onSubmit={handleSearch} className="hidden min-w-0 max-w-xl flex-1 items-center gap-2 md:flex">
         <div className="flex flex-1 items-center gap-2 rounded-full border border-cyan-900/60 bg-black/20 px-3 py-1">
           <Search size={14} className="text-cyan-300" />
           <input
@@ -70,6 +72,14 @@ export function Toolbar({ leftOpen, rightOpen, onToggleLeft, onToggleRight, onSe
       </form>
 
       <div className="flex items-center gap-3">
+        <button onClick={onOpenOnboarding} className="hidden rounded-full border border-white/10 px-2 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-300 hover:bg-white/5 lg:inline-flex">
+          <Sparkles size={12} className="mr-1" />
+          Guide
+        </button>
+        <button onClick={onOpenChangelog} className="hidden rounded-full border border-white/10 px-2 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-300 hover:bg-white/5 lg:inline-flex">
+          <BookOpen size={12} className="mr-1" />
+          Notes
+        </button>
         <div className="hidden font-mono text-xs text-slate-400 md:block">{time}</div>
         <button onClick={onToggleRight} className="rounded border border-white/10 p-1 text-slate-300 hover:bg-white/10">
           {rightOpen ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />}

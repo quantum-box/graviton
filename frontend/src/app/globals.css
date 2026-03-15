@@ -42,6 +42,10 @@ html, body {
   -webkit-font-smoothing: antialiased;
 }
 
+body {
+  overscroll-behavior: none;
+}
+
 /* MapLibre popup customization */
 .maplibregl-popup-content {
   background: var(--bg-surface) !important;
@@ -97,4 +101,11 @@ html, body {
 .maplibregl-ctrl-bottom-right,
 .maplibregl-ctrl-bottom-left {
   display: none;
+}
+
+@media (max-width: 767px) {
+  :root {
+    --toolbar-height: 42px;
+    --statusbar-height: 26px;
+  }
 }

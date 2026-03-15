@@ -3,14 +3,17 @@
 import type { LayerVisibility } from '@/app/page'
 import type { DashboardData, FocusLocation } from '@/types/dashboard'
 import { computeNightPolygon } from '@/utils/solarTerminator'
+import { getFlightOperator } from '@/utils/airlineCodes'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Map, { Layer, MapLayerMouseEvent, MapRef, Popup, Source } from 'react-map-gl/maplibre'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { MapMarkers } from '@/components/map/MapMarkers'
+import { ScaleBar } from '@/components/ScaleBar'
 
 export default function MapView({
   data,
   layers,
+  zoom,
   focusLocation,
   onSelect,
   onMouseMove,
@@ -18,6 +21,7 @@ export default function MapView({
 }: {
   data: DashboardData
   layers: LayerVisibility
+  zoom: number
   focusLocation: FocusLocation | null
   onSelect: (entity: any) => void
   onMouseMove: (coords: { lat: number; lng: number } | null) => void
@@ -25,6 +29,7 @@ export default function MapView({
 }) {
   const mapRef = useRef<MapRef>(null)
   const [popup, setPopup] = useState<any>(null)
+  const [mapCenter, setMapCenter] = useState({ lat: 26, lng: 20 })
   const nightPolygon = useMemo(() => computeNightPolygon(), [data.fastData?.last_updated, data.slowData?.last_updated])
 
   useEffect(() => {
@@ -77,6 +82,7 @@ export default function MapView({
         onClick={handleClick}
         onMouseMove={(e) => onMouseMove({ lat: e.lngLat.lat, lng: e.lngLat.lng })}
         onZoomEnd={(e) => onZoomChange(e.viewState.zoom)}
+        onMove={(e) => setMapCenter({ lat: e.viewState.latitude, lng: e.viewState.longitude })}
       >
         {layers.weather_radar && data.slowData?.weather && (data.slowData.weather as any).host && (data.slowData.weather as any).radar_tile_path && (
           <Source
@@ -108,13 +114,14 @@ export default function MapView({
           <Popup longitude={popup.lng} latitude={popup.lat} onClose={() => setPopup(null)} closeButton>
             <div className="space-y-1 text-xs">
               <div className="font-semibold text-cyan-300">{popup.title || popup.name || popup.callsign || popup.icao24 || popup.sourceType}</div>
-              {popup.operator && <div>{popup.operator}</div>}
+              {getFlightOperator(popup) && <div>{getFlightOperator(popup)}</div>}
               {popup.country && <div>{popup.country}</div>}
               {popup.description && <div className="max-w-[240px] text-slate-300">{String(popup.description).replace(/<[^>]+>/g, '').slice(0, 180)}</div>}
             </div>
           </Popup>
         )}
       </Map>
+      <ScaleBar zoom={zoom} latitude={mapCenter.lat} />
     </div>
   )
 }
