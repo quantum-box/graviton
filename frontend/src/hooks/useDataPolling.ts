@@ -3,7 +3,12 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 interface FastData {
   last_updated: string
   commercial_flights: any[]
+  private_flights: any[]
+  private_jets: any[]
   military_flights: any[]
+  tracked_flights: any[]
+  uavs: any[]
+  gps_jamming: any[]
   ships: any[]
   satellites: any[]
 }
@@ -16,10 +21,14 @@ interface SlowData {
   oil: any[]
   firms_fires: any[]
   gdelt: any[]
+  liveuamap: any[]
+  frontlines: any
   space_weather: any
   weather: any
   internet_outages: any[]
   kiwisdr: any[]
+  datacenters: any[]
+  cctv: any[]
 }
 
 export function useDataPolling() {

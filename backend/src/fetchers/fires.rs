@@ -8,7 +8,7 @@ pub async fn fetch(store: &Arc<DataStore>) -> anyhow::Result<()> {
         .build()?;
 
     let resp = client
-        .get("https://firms.modaps.eosdis.nasa.gov/api/area/csv/VIIRS_NOAA20_NRT/world/1")
+        .get("https://firms.modaps.eosdis.nasa.gov/data/active_fire/noaa-20-viirs-c2/csv/J1_VIIRS_C2_Global_24h.csv")
         .send()
         .await?;
 
@@ -24,19 +24,24 @@ pub async fn fetch(store: &Arc<DataStore>) -> anyhow::Result<()> {
         if let Ok(record) = result {
             let lat: f64 = record.get(0).and_then(|v| v.parse().ok()).unwrap_or(0.0);
             let lng: f64 = record.get(1).and_then(|v| v.parse().ok()).unwrap_or(0.0);
-            let frp: f64 = record.get(12).and_then(|v| v.parse().ok()).unwrap_or(0.0);
-            let confidence = record.get(9).unwrap_or("low").to_string();
+            let brightness: f64 = record.get(2).and_then(|v| v.parse().ok()).unwrap_or(0.0);
+            let confidence = record.get(8).unwrap_or("low").to_string();
             let acq_date = record.get(5).unwrap_or("").to_string();
             let acq_time = record.get(6).unwrap_or("").to_string();
+            let daynight = record.get(11).unwrap_or("").to_string();
+            let frp: f64 = record.get(13).and_then(|v| v.parse().ok()).unwrap_or(0.0);
 
             if lat != 0.0 && lng != 0.0 {
                 fires.push(json!({
                     "lat": lat,
                     "lng": lng,
                     "frp": frp,
+                    "brightness": brightness,
                     "confidence": confidence,
                     "satellite": "NOAA-20",
-                    "acq_time": format!("{} {}", acq_date, acq_time),
+                    "daynight": daynight,
+                    "acq_date": acq_date,
+                    "acq_time": acq_time,
                 }));
             }
         }

@@ -46,6 +46,8 @@ async fn main() {
         .route("/api/route/{callsign}", get(routes::flight_route))
         // Region dossier (right-click intel)
         .route("/api/region-dossier", get(routes::region_dossier))
+        .route("/api/geocode/reverse", get(routes::reverse_geocode))
+        .route("/api/geocode/search", get(routes::search_geocode))
         // Viewport update
         .route("/api/viewport", post(routes::update_viewport))
         // Radio endpoints

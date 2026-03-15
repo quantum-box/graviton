@@ -26,3 +26,5 @@ Thumbs.db
 # Data
 *.db
 data/
+!backend/data/
+!backend/data/*.json

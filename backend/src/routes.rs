@@ -23,6 +23,11 @@ pub struct LatLngQuery {
     pub lng: f64,
 }
 
+#[derive(Deserialize)]
+pub struct SearchQuery {
+    pub q: String,
+}
+
 // Fast-tier data: flights, ships, satellites
 pub async fn live_data_fast(
     State(store): State<AppState>,
@@ -43,7 +48,12 @@ pub async fn live_data_fast(
     let data = json!({
         "last_updated": Utc::now().to_rfc3339(),
         "commercial_flights": store.get("commercial_flights").unwrap_or(json!([])),
+        "private_flights": store.get("private_flights").unwrap_or(json!([])),
+        "private_jets": store.get("private_jets").unwrap_or(json!([])),
         "military_flights": store.get("military_flights").unwrap_or(json!([])),
+        "tracked_flights": store.get("tracked_flights").unwrap_or(json!([])),
+        "uavs": store.get("uavs").unwrap_or(json!([])),
+        "gps_jamming": store.get("gps_jamming").unwrap_or(json!([])),
         "ships": store.get("ships").unwrap_or(json!([])),
         "satellites": store.get("satellites").unwrap_or(json!([])),
     });
@@ -78,10 +88,14 @@ pub async fn live_data_slow(
         "oil": store.get("oil").unwrap_or(json!([])),
         "firms_fires": store.get("firms_fires").unwrap_or(json!([])),
         "gdelt": store.get("gdelt").unwrap_or(json!([])),
+        "frontlines": store.get("frontlines").unwrap_or(json!({"type":"FeatureCollection","features":[]})),
+        "liveuamap": store.get("liveuamap").unwrap_or(json!([])),
         "space_weather": store.get("space_weather").unwrap_or(json!({})),
         "weather": store.get("weather").unwrap_or(json!({})),
         "internet_outages": store.get("internet_outages").unwrap_or(json!([])),
         "kiwisdr": store.get("kiwisdr").unwrap_or(json!([])),
+        "datacenters": store.get("datacenters").unwrap_or(json!([])),
+        "cctv": store.get("cctv").unwrap_or(json!([])),
     });
 
     let mut resp_headers = HeaderMap::new();
@@ -212,6 +226,58 @@ pub async fn update_viewport(
     StatusCode::OK
 }
 
+pub async fn reverse_geocode(Query(params): Query<LatLngQuery>) -> Json<Value> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .unwrap();
+
+    let url = format!(
+        "https://nominatim.openstreetmap.org/reverse?lat={}&lon={}&format=jsonv2",
+        params.lat, params.lng
+    );
+    match client
+        .get(url)
+        .header("User-Agent", "Graviton/1.0")
+        .send()
+        .await
+    {
+        Ok(resp) if resp.status().is_success() => {
+            if let Ok(data) = resp.json::<Value>().await {
+                return Json(data);
+            }
+        }
+        _ => {}
+    }
+    Json(json!({}))
+}
+
+pub async fn search_geocode(Query(params): Query<SearchQuery>) -> Json<Value> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .unwrap();
+
+    let url = format!(
+        "https://nominatim.openstreetmap.org/search?q={}&format=jsonv2&limit=8",
+        urlencoding::encode(&params.q)
+    );
+    match client
+        .get(url)
+        .header("User-Agent", "Graviton/1.0")
+        .send()
+        .await
+    {
+        Ok(resp) if resp.status().is_success() => {
+            if let Ok(data) = resp.json::<Value>().await {
+                return Json(data);
+            }
+        }
+        _ => {}
+    }
+    Json(json!([]))
+}
+
 pub async fn radio_top() -> Json<Value> {
     let client = reqwest::Client::new();
     match client.get("https://www.broadcastify.com/calls/status/topFeed")
@@ -328,10 +394,47 @@ pub async fn debug_latest(State(store): State<AppState>) -> Json<Value> {
 }
 
 pub async fn ais_feed(
-    State(_store): State<AppState>,
-    Json(_body): Json<Value>,
+    State(store): State<AppState>,
+    Json(body): Json<Value>,
 ) -> StatusCode {
-    // Accept AIS messages from local AIS-catcher
+    let mut ships = Vec::new();
+    let items = body
+        .get("messages")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .or_else(|| body.as_array().cloned())
+        .unwrap_or_default();
+
+    for item in items {
+        let Some(mmsi) = item.get("mmsi").and_then(|v| v.as_i64().or_else(|| v.as_str()?.parse().ok())) else {
+            continue;
+        };
+        let lat = item
+            .get("lat")
+            .or_else(|| item.get("latitude"))
+            .and_then(|v| v.as_f64().or_else(|| v.as_str()?.parse().ok()));
+        let lng = item
+            .get("lon")
+            .or_else(|| item.get("lng"))
+            .or_else(|| item.get("longitude"))
+            .and_then(|v| v.as_f64().or_else(|| v.as_str()?.parse().ok()));
+        let (Some(lat), Some(lng)) = (lat, lng) else { continue };
+        ships.push(json!({
+            "mmsi": mmsi.to_string(),
+            "name": item.get("shipname").or_else(|| item.get("name")).cloned().unwrap_or(Value::Null),
+            "type": classify_ais_type(item.get("shiptype").and_then(|v| v.as_u64()).unwrap_or(0)),
+            "lat": lat,
+            "lng": lng,
+            "heading": item.get("heading").cloned().unwrap_or(Value::Null),
+            "sog": item.get("speed").or_else(|| item.get("sog")).cloned().unwrap_or(Value::Null),
+            "cog": item.get("course").or_else(|| item.get("cog")).cloned().unwrap_or(Value::Null),
+            "destination": item.get("destination").cloned().unwrap_or(Value::Null),
+            "country": item.get("country").cloned().unwrap_or(Value::Null),
+            "source": "ais_ingest",
+        }));
+    }
+    store.set("ais_feed_snapshot", json!(ships));
+    store.update_etag("fast");
     StatusCode::OK
 }
 
@@ -376,5 +479,16 @@ fn check_admin(store: &AppState, headers: &HeaderMap) -> bool {
                 .unwrap_or(false)
         }
         None => true, // No admin key = open access
+    }
+}
+
+fn classify_ais_type(code: u64) -> &'static str {
+    match code {
+        80..=89 => "tanker",
+        70..=79 => "cargo",
+        60..=69 => "passenger",
+        35 => "military_vessel",
+        36 | 37 => "yacht",
+        _ => "other",
     }
 }

@@ -9,7 +9,8 @@ const DEFAULT_FEEDS: &[(&str, &str)] = &[
     ("NYT World", "https://rss.nytimes.com/services/xml/rss/nyt/World.xml"),
     ("GDACS", "https://www.gdacs.org/xml/rss.xml"),
     ("NHK World", "https://www3.nhk.or.jp/nhkworld/en/news/feeds/"),
-    ("Reuters", "https://www.reutersagency.com/feed/"),
+    ("Reuters World", "https://www.reutersagency.com/feed/?best-topics=world&post_type=best"),
+    ("AP News", "https://feeds.apnews.com/rss/apf-topnews"),
 ];
 
 const RISK_KEYWORDS: &[(&str, u8)] = &[
@@ -80,6 +81,7 @@ pub async fn fetch(store: &Arc<DataStore>) -> anyhow::Result<()> {
                                 "lat": lat,
                                 "lng": lng,
                                 "risk_score": risk,
+                                "cluster_key": format!("{:.1}:{:.1}:{}", lat.unwrap_or(0.0), lng.unwrap_or(0.0), risk),
                                 "summary": summary,
                             }));
                         }
