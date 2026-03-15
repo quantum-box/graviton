@@ -81,12 +81,20 @@ export default function MapView({
   }
 
   return (
-    <div className={`relative min-h-[40vh] flex-1 ${activeTool === 'measure' ? 'cursor-crosshair' : activeTool === 'marker' ? 'cursor-cell' : activeTool === 'filter' ? 'cursor-help' : 'cursor-default'}`}>
+    <div
+      className={`fixed inset-0 h-[100dvh] w-screen overflow-hidden ${activeTool === 'measure' ? 'cursor-crosshair' : activeTool === 'marker' ? 'cursor-cell' : activeTool === 'filter' ? 'cursor-help' : 'cursor-default'}`}
+      data-map-view="true"
+    >
       <Map
         ref={mapRef}
+        reuseMaps
         initialViewState={{ longitude: 20, latitude: 26, zoom: 2.8 }}
         mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
         interactiveLayerIds={interactiveLayerIds}
+        style={{ width: '100%', height: '100%' }}
+        attributionControl={false}
+        dragPan
+        touchZoomRotate
         onClick={handleClick}
         onMouseMove={(e) => onMouseMove({ lat: e.lngLat.lat, lng: e.lngLat.lng })}
         onZoomEnd={(e) => onZoomChange(e.viewState.zoom)}

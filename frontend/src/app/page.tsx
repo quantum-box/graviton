@@ -6,13 +6,16 @@ import dynamic from 'next/dynamic'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   BookOpen,
+  Bell,
   CircleHelp,
+  Crosshair,
   Filter,
   Layers3,
   Lock,
   Map,
   Radio,
   Search,
+  ShieldAlert,
   Settings2,
   Sparkles,
   X,
@@ -105,6 +108,7 @@ const DEFAULT_FILTERS: FilterState = {
 }
 
 type FlyoutId = 'layers' | 'filters' | 'intel'
+type MobileSheetId = FlyoutId | 'search' | 'alerts'
 
 const DESKTOP_FLYOUTS: Array<{ id: FlyoutId; label: string; icon: typeof Layers3 }> = [
   { id: 'layers', label: 'Sources', icon: Layers3 },
@@ -112,10 +116,12 @@ const DESKTOP_FLYOUTS: Array<{ id: FlyoutId; label: string; icon: typeof Layers3
   { id: 'intel', label: 'Signals', icon: Radio },
 ]
 
-const MOBILE_SHEETS: Array<{ id: FlyoutId; label: string; icon: typeof Layers3 }> = [
-  { id: 'layers', label: 'Sources', icon: Layers3 },
-  { id: 'filters', label: 'Filters', icon: Filter },
-  { id: 'intel', label: 'Signals', icon: Radio },
+const MOBILE_NAV_ITEMS: Array<{ id: 'map' | MobileSheetId | 'settings'; label: string; icon: typeof Layers3 }> = [
+  { id: 'map', label: 'Map', icon: Map as typeof Layers3 },
+  { id: 'layers', label: 'Layers', icon: Layers3 },
+  { id: 'search', label: 'Search', icon: Search as typeof Layers3 },
+  { id: 'alerts', label: 'Alerts', icon: Bell as typeof Layers3 },
+  { id: 'settings', label: 'Settings', icon: Settings2 as typeof Layers3 },
 ]
 
 function TopToolbar({
@@ -264,21 +270,49 @@ function MobileBottomSheet({
   onClose: () => void
   children: ReactNode
 }) {
+  const [dragOffset, setDragOffset] = useState(0)
+  const [touchStartY, setTouchStartY] = useState<number | null>(null)
+
+  function handleTouchStart(event: React.TouchEvent<HTMLDivElement>) {
+    setTouchStartY(event.touches[0]?.clientY ?? null)
+  }
+
+  function handleTouchMove(event: React.TouchEvent<HTMLDivElement>) {
+    if (touchStartY === null) return
+    const nextOffset = Math.max(0, (event.touches[0]?.clientY ?? touchStartY) - touchStartY)
+    setDragOffset(nextOffset)
+  }
+
+  function handleTouchEnd() {
+    if (dragOffset > 84) {
+      onClose()
+    }
+    setDragOffset(0)
+    setTouchStartY(null)
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       className="pointer-events-auto absolute inset-0 z-50 bg-black/35 md:hidden"
+      onClick={onClose}
     >
       <motion.section
         initial={{ y: '100%' }}
-        animate={{ y: 0 }}
+        animate={{ y: dragOffset }}
         exit={{ y: '100%' }}
         transition={{ duration: 0.22, ease: 'easeOut' }}
-        className="absolute inset-x-0 bottom-0 max-h-[72vh] overflow-hidden rounded-t-[28px] border-t border-white/10 bg-[rgba(7,14,24,0.96)] shadow-[0_-18px_60px_rgba(0,0,0,0.38)] backdrop-blur-xl"
+        className="absolute inset-x-0 bottom-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom)+4px)] max-h-[min(78vh,calc(100dvh-var(--bottom-nav-height)-env(safe-area-inset-bottom)-48px))] overflow-hidden rounded-t-[28px] border-t border-white/10 bg-[rgba(7,14,24,0.96)] shadow-[0_-18px_60px_rgba(0,0,0,0.38)] backdrop-blur-xl"
+        onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-4 py-3">
+        <div
+          className="flex items-center justify-between px-4 py-3"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
           <div>
             <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-white/15" />
             <div className="text-[11px] font-semibold uppercase tracking-[0.26em] text-slate-300">{title}</div>
@@ -292,7 +326,7 @@ function MobileBottomSheet({
             <X size={15} />
           </button>
         </div>
-        <div className="max-h-[calc(72vh-64px)] overflow-y-auto px-4 pb-6">{children}</div>
+        <div className="max-h-[calc(min(78vh,calc(100dvh-var(--bottom-nav-height)-env(safe-area-inset-bottom)-48px))-64px)] overflow-y-auto px-4 pb-6">{children}</div>
       </motion.section>
     </motion.div>
   )
@@ -311,8 +345,10 @@ export default function Dashboard() {
   const [focusLocation, setFocusLocation] = useState<{ lat: number; lng: number; label?: string } | null>(null)
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS)
   const [leftFlyout, setLeftFlyout] = useState<FlyoutId | null>('layers')
-  const [mobileSheet, setMobileSheet] = useState<FlyoutId | null>(null)
+  const [mobileSheet, setMobileSheet] = useState<MobileSheetId | null>(null)
   const [rightPanelOpen, setRightPanelOpen] = useState(false)
+  const [lastMobileSheet, setLastMobileSheet] = useState<MobileSheetId>('layers')
+  const [mobileSwipeStartY, setMobileSwipeStartY] = useState<number | null>(null)
   const [authToken, setAuthToken] = useState<string | null>(null)
   const [authUser, setAuthUser] = useState<any>(null)
   const [sharedObjects, setSharedObjects] = useState<any[]>([])
@@ -419,6 +455,10 @@ export default function Dashboard() {
   }, [selectedEntity])
 
   useEffect(() => {
+    if (mobileSheet) setLastMobileSheet(mobileSheet)
+  }, [mobileSheet])
+
+  useEffect(() => {
     window.localStorage.setItem('graviton-dashboard-layout', JSON.stringify(layout))
   }, [layout])
 
@@ -495,9 +535,88 @@ export default function Dashboard() {
     return <RadioInterceptPanel location={focusLocation} />
   }
 
+  function renderMobileSheetContent(id: MobileSheetId) {
+    if (id === 'search') {
+      return (
+        <div className="space-y-4">
+          <FindLocateBar
+            onSelect={(location) => {
+              setFocusLocation(location)
+              setMobileSheet(null)
+            }}
+          />
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300">
+            Search for a city, port, base, or paste coordinates as `lat, lng`.
+          </div>
+        </div>
+      )
+    }
+
+    if (id === 'alerts') {
+      const alerts = filteredFastData?.alerts ?? liveSocket.alerts
+      if (alerts.length === 0) {
+        return <div className="rounded-3xl border border-white/10 bg-white/5 p-4 text-sm text-slate-400">No active alerts.</div>
+      }
+
+      return (
+        <div className="space-y-3">
+          {alerts.map((alert, index) => (
+            <div key={`${alert.id ?? index}`} className="rounded-3xl border border-amber-300/20 bg-[rgba(31,18,10,0.86)] p-4 shadow-lg">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-[11px] uppercase tracking-[0.18em] text-amber-200">{alert.severity ?? 'info'}</div>
+                <div className="text-[10px] text-slate-400">{alert.source}</div>
+              </div>
+              <div className="mt-2 text-sm text-white">{alert.title}</div>
+              <div className="mt-1 text-xs text-slate-300">{alert.message}</div>
+            </div>
+          ))}
+        </div>
+      )
+    }
+
+    return renderFlyoutContent(id)
+  }
+
+  async function handleLocateUser() {
+    if (!navigator.geolocation) return
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        startTransition(() => {
+          setFocusLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+            label: 'Current location',
+          })
+        })
+      },
+      () => {},
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
+    )
+  }
+
   return (
     <DashboardDataProvider fastData={filteredFastData} slowData={mergedSlowData} selectedEntity={selectedEntity} setSelectedEntity={setSelectedEntity}>
-      <div className="relative h-screen w-screen overflow-hidden bg-[#07101a] text-[var(--text-primary)]">
+      <div
+        className="fixed inset-0 h-[100dvh] w-screen overflow-hidden bg-[#07101a] text-[var(--text-primary)]"
+        onTouchStart={(event) => {
+          const startY = event.touches[0]?.clientY ?? 0
+          if (startY > window.innerHeight - 96 && !mobileSheet && !rightPanelOpen) {
+            setMobileSwipeStartY(startY)
+          }
+        }}
+        onTouchEnd={(event) => {
+          if (mobileSwipeStartY === null || mobileSheet || rightPanelOpen) {
+            setMobileSwipeStartY(null)
+            return
+          }
+          const endY = event.changedTouches[0]?.clientY ?? 0
+          if (mobileSwipeStartY - endY > 72) {
+            setMobileSheet(lastMobileSheet)
+          }
+          setMobileSwipeStartY(null)
+        }}
+      >
         <ErrorBoundary fallbackTitle={t('shell.mapCanvas')}>
           <MapView
             data={dashboardData}
@@ -582,120 +701,123 @@ export default function Dashboard() {
             )}
           </AnimatePresence>
 
-          <div className="absolute inset-x-3 top-3 md:hidden">
-            <div className="pointer-events-auto flex h-10 items-center gap-2 rounded-full border border-white/12 bg-[rgba(7,14,24,0.86)] px-3 shadow-[0_18px_48px_rgba(0,0,0,0.32)] backdrop-blur-xl">
+          <div className="absolute inset-x-2 top-2 md:hidden">
+            <div className="pointer-events-auto flex h-8 items-center gap-2 rounded-full border border-white/12 bg-[rgba(7,14,24,0.74)] px-3 shadow-[0_18px_48px_rgba(0,0,0,0.32)] backdrop-blur-xl">
               <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-white">
-                <Map size={14} />
+                <ShieldAlert size={13} />
                 <span>GRAVITON</span>
               </div>
-              <div className="min-w-0 flex-1">
-                <FindLocateBar onSelect={(location) => setFocusLocation(location)} />
-              </div>
+              <div className="ml-auto text-[10px] uppercase tracking-[0.2em] text-teal-200">{isLoading ? 'Sync' : 'Live'}</div>
               <button
                 type="button"
                 onClick={() => setAuthOpen(true)}
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 text-slate-300"
+                className="flex h-6 w-6 items-center justify-center rounded-full border border-white/10 text-slate-300"
                 aria-label="Open auth"
               >
-                <Lock size={15} />
+                <Lock size={12} />
               </button>
               <button
                 type="button"
                 onClick={() => setSettingsOpen(true)}
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 text-slate-300"
+                className="flex h-6 w-6 items-center justify-center rounded-full border border-white/10 text-slate-300"
                 aria-label="Open settings"
               >
-                <Settings2 size={15} />
+                <Settings2 size={12} />
               </button>
             </div>
           </div>
 
-          <div className="absolute bottom-20 right-3 flex flex-col gap-2 md:hidden">
-            {MOBILE_SHEETS.map(({ id, label, icon: Icon }) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setMobileSheet(id)}
-                className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-[rgba(7,14,24,0.86)] text-slate-100 shadow-[0_16px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl"
-                title={label}
-                aria-label={label}
-              >
-                <Icon size={18} />
-              </button>
-            ))}
-            {selectedEntity && (
-              <button
-                type="button"
-                onClick={() => setRightPanelOpen(true)}
-                className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full bg-[linear-gradient(135deg,#2dd4bf,#0f766e)] text-slate-950 shadow-[0_16px_40px_rgba(15,118,110,0.45)]"
-                aria-label="Open selection details"
-              >
-                <Search size={18} />
-              </button>
-            )}
+          <button
+            type="button"
+            onClick={() => void handleLocateUser()}
+            className="pointer-events-auto absolute bottom-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom)+14px)] right-3 z-30 flex h-12 w-12 items-center justify-center rounded-full bg-[linear-gradient(135deg,#2dd4bf,#0f766e)] text-slate-950 shadow-[0_16px_40px_rgba(15,118,110,0.45)] md:hidden"
+            aria-label="Move to current location"
+          >
+            <Crosshair size={18} />
+          </button>
+
+          <div className="absolute inset-x-0 bottom-0 md:hidden">
+            <div className="pointer-events-auto flex h-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom))] items-start justify-around border-t border-white/10 bg-[rgba(7,14,24,0.94)] px-2 pt-2 shadow-[0_-18px_48px_rgba(0,0,0,0.32)] backdrop-blur-xl">
+              {MOBILE_NAV_ITEMS.map(({ id, label, icon: Icon }) => {
+                const active =
+                  (id === 'map' && !mobileSheet && !rightPanelOpen) ||
+                  (id !== 'map' && id !== 'settings' && mobileSheet === id) ||
+                  (id === 'settings' && settingsOpen)
+
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => {
+                      if (id === 'map') {
+                        setMobileSheet(null)
+                        setRightPanelOpen(false)
+                        return
+                      }
+
+                      if (id === 'settings') {
+                        setSettingsOpen(true)
+                        return
+                      }
+
+                      setRightPanelOpen(false)
+                      setMobileSheet(id)
+                    }}
+                    className={`flex min-w-0 flex-1 flex-col items-center gap-1 rounded-2xl px-1 py-1.5 text-[10px] uppercase tracking-[0.18em] transition ${
+                      active ? 'text-teal-200' : 'text-slate-400'
+                    }`}
+                    aria-label={label}
+                  >
+                    <div className={`flex h-8 w-8 items-center justify-center rounded-full border ${active ? 'border-teal-300/30 bg-teal-400/15' : 'border-white/10 bg-white/5'}`}>
+                      <Icon size={16} />
+                    </div>
+                    <span className="truncate">{label}</span>
+                  </button>
+                )
+              })}
+            </div>
           </div>
 
           <AnimatePresence initial={false}>
             {mobileSheet && (
-              <MobileBottomSheet title={MOBILE_SHEETS.find((item) => item.id === mobileSheet)?.label ?? ''} onClose={() => setMobileSheet(null)}>
-                {renderFlyoutContent(mobileSheet)}
+              <MobileBottomSheet
+                title={mobileSheet === 'search' ? 'Search' : mobileSheet === 'alerts' ? 'Alerts' : DESKTOP_FLYOUTS.find((item) => item.id === mobileSheet)?.label ?? ''}
+                onClose={() => setMobileSheet(null)}
+              >
+                {renderMobileSheetContent(mobileSheet)}
               </MobileBottomSheet>
             )}
           </AnimatePresence>
 
           <AnimatePresence initial={false}>
             {rightPanelOpen && deferredSelectedEntity && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="pointer-events-auto absolute inset-0 z-40 bg-black/35 md:hidden"
+              <div className="md:hidden"
               >
-                <motion.section
-                  initial={{ y: '100%' }}
-                  animate={{ y: 0 }}
-                  exit={{ y: '100%' }}
-                  transition={{ duration: 0.22, ease: 'easeOut' }}
-                  className="absolute inset-x-0 bottom-0 max-h-[74vh] overflow-hidden rounded-t-[28px] border-t border-white/10 bg-[rgba(7,14,24,0.96)] shadow-[0_-18px_60px_rgba(0,0,0,0.38)] backdrop-blur-xl"
-                >
-                  <div className="flex items-center justify-between px-4 py-3">
-                    <div>
-                      <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-white/15" />
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.26em] text-slate-300">Selection</div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setRightPanelOpen(false)}
-                      className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 text-slate-300"
-                      aria-label="Close selection panel"
-                    >
-                      <X size={15} />
-                    </button>
-                  </div>
-                  <div className="max-h-[calc(74vh-64px)] overflow-y-auto px-4 pb-6">
-                    <RightPanel selectedEntity={deferredSelectedEntity} fastData={filteredFastData} slowData={mergedSlowData} focusLocation={focusLocation} className="bg-transparent" />
-                  </div>
-                </motion.section>
-              </motion.div>
+                <MobileBottomSheet title="Selection" onClose={() => setRightPanelOpen(false)}>
+                  <RightPanel selectedEntity={deferredSelectedEntity} fastData={filteredFastData} slowData={mergedSlowData} focusLocation={focusLocation} className="bg-transparent" />
+                </MobileBottomSheet>
+              </div>
             )}
           </AnimatePresence>
         </div>
 
-        <C2Panel
-          token={authToken}
-          state={c2State}
-          selectedEntity={deferredSelectedEntity}
-          onRefresh={() => {
-            fetch('/api/c2/state')
-              .then((resp) => resp.json())
-              .then((data) => setC2State(data))
-              .catch(() => {})
-          }}
-          position={layout.c2}
-          onMove={(position) => setLayout((current) => ({ ...current, c2: position }))}
-        />
+        <div className="hidden md:block">
+          <C2Panel
+            token={authToken}
+            state={c2State}
+            selectedEntity={deferredSelectedEntity}
+            onRefresh={() => {
+              fetch('/api/c2/state')
+                .then((resp) => resp.json())
+                .then((data) => setC2State(data))
+                .catch(() => {})
+            }}
+            position={layout.c2}
+            onMove={(position) => setLayout((current) => ({ ...current, c2: position }))}
+          />
+        </div>
 
-        <div className="pointer-events-none absolute inset-x-3 bottom-3 z-20">
+        <div className="pointer-events-none absolute inset-x-3 bottom-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom)+8px)] z-20 md:bottom-3">
           <StatusBar coords={mouseCoords} zoom={zoom} counts={counts} statusLabel={focusLocation?.label} />
         </div>
 
