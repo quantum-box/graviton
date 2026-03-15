@@ -21,6 +21,9 @@ const LAYERS: Array<{ key: keyof LayerVisibility; icon: any; color: string }> = 
   { key: 'gps_jamming', icon: Zap, color: '#f97316' },
   { key: 'ships', icon: Ship, color: '#22c55e' },
   { key: 'satellites', icon: Satellite, color: '#fde047' },
+  { key: 'fused_objects', icon: Radar, color: '#f8fafc' },
+  { key: 'simulation_markers', icon: Radar, color: '#fb7185' },
+  { key: 'shared_objects', icon: Radar, color: '#34d399' },
   { key: 'earthquakes', icon: AlertTriangle, color: '#fb923c' },
   { key: 'firms_fires', icon: Flame, color: '#f97316' },
   { key: 'news', icon: Newspaper, color: '#a78bfa' },
@@ -32,6 +35,9 @@ const LAYERS: Array<{ key: keyof LayerVisibility; icon: any; color: string }> = 
   { key: 'datacenters', icon: Radar, color: '#94a3b8' },
   { key: 'cctv', icon: Tv, color: '#c084fc' },
   { key: 'weather_radar', icon: Radar, color: '#60a5fa' },
+  { key: 'sentinel_overlay', icon: Satellite, color: '#22d3ee' },
+  { key: 'trajectories', icon: Radar, color: '#fbbf24' },
+  { key: 'predictions', icon: Radar, color: '#f472b6' },
   { key: 'day_night', icon: Radar, color: '#fef08a' },
 ]
 

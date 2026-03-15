@@ -1,15 +1,19 @@
 use axum::{
-    extract::{Path, Query, State},
+    extract::{
+        Path, Query, State,
+        ws::{Message, WebSocket, WebSocketUpgrade},
+    },
     http::{HeaderMap, StatusCode},
-    response::IntoResponse,
+    response::{Html, IntoResponse},
     Json,
 };
 use chrono::Utc;
 use serde::Deserialize;
 use serde_json::{json, Value};
-use std::collections::HashMap;
+use sqlx::Row;
+use uuid::Uuid;
 
-use crate::AppState;
+use crate::{auth, intel, AppState};
 
 #[derive(Deserialize)]
 pub struct BboxQuery {
@@ -30,6 +34,12 @@ pub struct SearchQuery {
     pub q: String,
 }
 
+#[derive(Deserialize)]
+pub struct TrackQuery {
+    pub object_type: String,
+    pub object_id: String,
+}
+
 pub async fn live_data_fast(
     State(store): State<AppState>,
     headers: HeaderMap,
@@ -43,28 +53,14 @@ pub async fn live_data_fast(
             }
         }
     }
-    let data = json!({
-        "last_updated": Utc::now().to_rfc3339(),
-        "commercial_flights": store.get("commercial_flights").unwrap_or(json!([])),
-        "private_flights": store.get("private_flights").unwrap_or(json!([])),
-        "private_jets": store.get("private_jets").unwrap_or(json!([])),
-        "military_flights": store.get("military_flights").unwrap_or(json!([])),
-        "tracked_flights": store.get("tracked_flights").unwrap_or(json!([])),
-        "uavs": store.get("uavs").unwrap_or(json!([])),
-        "gps_jamming": store.get("gps_jamming").unwrap_or(json!([])),
-        "ships": store.get("ships").unwrap_or(json!([])),
-        "satellites": store.get("satellites").unwrap_or(json!([])),
-    });
+    let data = store.fast_snapshot();
     let mut resp_headers = HeaderMap::new();
     resp_headers.insert("etag", format!("\"{}\"", etag).parse().unwrap());
     resp_headers.insert("cache-control", "no-cache".parse().unwrap());
     (StatusCode::OK, resp_headers, serde_json::to_string(&data).unwrap()).into_response()
 }
 
-pub async fn live_data_slow(
-    State(store): State<AppState>,
-    headers: HeaderMap,
-) -> impl IntoResponse {
+pub async fn live_data_slow(State(store): State<AppState>, headers: HeaderMap) -> impl IntoResponse {
     let etag = store.get_etag("slow");
     if let Some(if_none_match) = headers.get("if-none-match") {
         if let Ok(val) = if_none_match.to_str() {
@@ -73,23 +69,7 @@ pub async fn live_data_slow(
             }
         }
     }
-    let data = json!({
-        "last_updated": Utc::now().to_rfc3339(),
-        "earthquakes": store.get("earthquakes").unwrap_or(json!([])),
-        "news": store.get("news").unwrap_or(json!([])),
-        "stocks": store.get("stocks").unwrap_or(json!([])),
-        "oil": store.get("oil").unwrap_or(json!([])),
-        "firms_fires": store.get("firms_fires").unwrap_or(json!([])),
-        "gdelt": store.get("gdelt").unwrap_or(json!([])),
-        "frontlines": store.get("frontlines").unwrap_or(json!({"type":"FeatureCollection","features":[]})),
-        "liveuamap": store.get("liveuamap").unwrap_or(json!([])),
-        "space_weather": store.get("space_weather").unwrap_or(json!({})),
-        "weather": store.get("weather").unwrap_or(json!({})),
-        "internet_outages": store.get("internet_outages").unwrap_or(json!([])),
-        "kiwisdr": store.get("kiwisdr").unwrap_or(json!([])),
-        "datacenters": store.get("datacenters").unwrap_or(json!([])),
-        "cctv": store.get("cctv").unwrap_or(json!([])),
-    });
+    let data = store.slow_snapshot();
     let mut resp_headers = HeaderMap::new();
     resp_headers.insert("etag", format!("\"{}\"", etag).parse().unwrap());
     (StatusCode::OK, resp_headers, serde_json::to_string(&data).unwrap()).into_response()
@@ -111,6 +91,7 @@ pub async fn health(State(store): State<AppState>) -> Json<Value> {
         "uptime_seconds": uptime,
         "sources": sources,
         "env": store.config.env_status(),
+        "alerts": store.latest_alerts.read().len(),
     }))
 }
 
@@ -138,10 +119,7 @@ pub async fn region_dossier(Query(params): Query<LatLngQuery>) -> Json<Value> {
     )
 }
 
-pub async fn update_viewport(
-    State(store): State<AppState>,
-    Json(viewport): Json<crate::store::Viewport>,
-) -> StatusCode {
+pub async fn update_viewport(State(store): State<AppState>, Json(viewport): Json<crate::store::Viewport>) -> StatusCode {
     *store.viewport.write() = Some(viewport);
     StatusCode::OK
 }
@@ -208,11 +186,7 @@ pub async fn get_api_keys(State(store): State<AppState>, headers: HeaderMap) -> 
     .into_response()
 }
 
-pub async fn update_api_keys(
-    State(store): State<AppState>,
-    headers: HeaderMap,
-    Json(body): Json<Value>,
-) -> impl IntoResponse {
+pub async fn update_api_keys(State(store): State<AppState>, headers: HeaderMap, Json(body): Json<Value>) -> impl IntoResponse {
     if !check_admin(&store, &headers) {
         return StatusCode::UNAUTHORIZED;
     }
@@ -221,7 +195,7 @@ pub async fn update_api_keys(
         .map(|obj| {
             obj.iter()
                 .filter_map(|(k, v)| v.as_str().map(|s| (k.to_string(), s.to_string())))
-                .collect::<HashMap<_, _>>()
+                .collect::<std::collections::HashMap<_, _>>()
         })
         .unwrap_or_default();
     if crate::settings::update_api_keys(&values).is_ok() {
@@ -235,11 +209,7 @@ pub async fn get_news_feeds() -> Json<Value> {
     Json(json!({ "feeds": crate::settings::load_news_feeds() }))
 }
 
-pub async fn update_news_feeds(
-    State(store): State<AppState>,
-    headers: HeaderMap,
-    Json(body): Json<Value>,
-) -> impl IntoResponse {
+pub async fn update_news_feeds(State(store): State<AppState>, headers: HeaderMap, Json(body): Json<Value>) -> impl IntoResponse {
     if !check_admin(&store, &headers) {
         return StatusCode::UNAUTHORIZED;
     }
@@ -259,91 +229,375 @@ pub async fn reset_news_feeds() -> StatusCode {
     if crate::settings::reset_news_feeds().is_ok() {
         StatusCode::OK
     } else {
-        StatusCode::INTERNAL_SERVER_ERROR
+        StatusCode::BAD_REQUEST
     }
 }
 
-pub async fn force_refresh(State(_store): State<AppState>) -> StatusCode {
-    StatusCode::OK
+pub async fn force_refresh(State(store): State<AppState>) -> Json<Value> {
+    crate::fetchers::spawn_manual_refresh(store.clone());
+    Json(json!({ "status": "refresh scheduled" }))
 }
 
 pub async fn debug_latest(State(store): State<AppState>) -> Json<Value> {
-    let mut info = json!({});
-    for key in store.all_keys() {
-        let count = store.get(&key).and_then(|v| v.as_array().map(|a| a.len())).unwrap_or(0);
-        info[&key] = json!(count);
-    }
-    Json(info)
+    Json(json!({
+        "fast": store.fast_snapshot(),
+        "slow": store.slow_snapshot(),
+    }))
 }
 
 pub async fn ais_feed(State(store): State<AppState>, Json(body): Json<Value>) -> StatusCode {
-    let mut ships = Vec::new();
-    let items = body
-        .get("messages")
-        .and_then(|v| v.as_array())
-        .cloned()
-        .or_else(|| body.as_array().cloned())
-        .unwrap_or_default();
-    for item in items {
-        let Some(mmsi) = item.get("mmsi").and_then(|v| v.as_i64().or_else(|| v.as_str()?.parse().ok())) else {
-            continue;
-        };
-        let lat = item.get("lat").or_else(|| item.get("latitude")).and_then(|v| v.as_f64().or_else(|| v.as_str()?.parse().ok()));
-        let lng = item
-            .get("lon")
-            .or_else(|| item.get("lng"))
-            .or_else(|| item.get("longitude"))
-            .and_then(|v| v.as_f64().or_else(|| v.as_str()?.parse().ok()));
-        let (Some(lat), Some(lng)) = (lat, lng) else { continue };
-        ships.push(json!({
-            "mmsi": mmsi.to_string(),
-            "name": item.get("shipname").or_else(|| item.get("name")).cloned().unwrap_or(Value::Null),
-            "type": classify_ais_type(item.get("shiptype").and_then(|v| v.as_u64()).unwrap_or(0)),
-            "lat": lat,
-            "lng": lng,
-            "heading": item.get("heading").cloned().unwrap_or(Value::Null),
-            "sog": item.get("speed").or_else(|| item.get("sog")).cloned().unwrap_or(Value::Null),
-            "cog": item.get("course").or_else(|| item.get("cog")).cloned().unwrap_or(Value::Null),
-            "destination": item.get("destination").cloned().unwrap_or(Value::Null),
-            "country": item.get("country").cloned().unwrap_or(Value::Null),
-            "source": "ais_ingest",
-        }));
-    }
-    store.set("ais_feed_snapshot", json!(ships));
-    store.update_etag("fast");
+    store.set("ais_feed_snapshot", body);
     StatusCode::OK
 }
 
 pub async fn sentinel_search(Query(params): Query<LatLngQuery>) -> Json<Value> {
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(15))
-        .build()
-        .unwrap();
-    Json(
-        crate::fetchers::sentinel::search(&client, params.lat, params.lng)
-            .await
-            .unwrap_or_else(|_| json!({"features": []})),
+    let client = reqwest::Client::new();
+    let query = crate::fetchers::sentinel::search(&client, params.lat, params.lng).await.unwrap_or_else(|_| json!([]));
+    Json(json!({
+        "results": query,
+        "tile_url": "https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2024_3857/default/g/{z}/{y}/{x}.jpg"
+    }))
+}
+
+pub async fn ws_live(ws: WebSocketUpgrade, State(store): State<AppState>) -> impl IntoResponse {
+    ws.on_upgrade(move |socket| handle_socket(socket, store))
+}
+
+async fn handle_socket(mut socket: WebSocket, store: AppState) {
+    let _ = socket
+        .send(Message::Text(
+            json!({
+                "type": "snapshot",
+                "fast": store.fast_snapshot(),
+                "slow": store.slow_snapshot(),
+            })
+            .to_string()
+            .into(),
+        ))
+        .await;
+    let mut rx = store.subscribe();
+    loop {
+        tokio::select! {
+            recv = rx.recv() => {
+                match recv {
+                    Ok(event) => {
+                        if socket.send(Message::Text(serde_json::to_string(&event).unwrap_or_else(|_| "{}".to_string()).into())).await.is_err() {
+                            break;
+                        }
+                    }
+                    Err(_) => break,
+                }
+            }
+            incoming = socket.recv() => {
+                match incoming {
+                    Some(Ok(Message::Close(_))) | None => break,
+                    Some(Ok(_)) => {}
+                    Some(Err(_)) => break,
+                }
+            }
+        }
+    }
+}
+
+pub async fn auth_register(State(store): State<AppState>, Json(payload): Json<auth::AuthPayload>) -> impl IntoResponse {
+    match auth::register(&store, payload).await {
+        Ok(resp) => (StatusCode::CREATED, Json(json!(resp))).into_response(),
+        Err(err) => (StatusCode::BAD_REQUEST, Json(json!({ "error": err.to_string() }))).into_response(),
+    }
+}
+
+pub async fn auth_login(State(store): State<AppState>, Json(payload): Json<auth::AuthPayload>) -> impl IntoResponse {
+    match auth::login(&store, payload).await {
+        Ok(resp) => (StatusCode::OK, Json(json!(resp))).into_response(),
+        Err(_) => (StatusCode::UNAUTHORIZED, Json(json!({ "error": "Invalid credentials" }))).into_response(),
+    }
+}
+
+pub async fn auth_me(State(store): State<AppState>, headers: HeaderMap) -> impl IntoResponse {
+    if let Some(claims) = auth::auth_from_headers(&store, &headers) {
+        (StatusCode::OK, Json(json!({ "user": claims }))).into_response()
+    } else {
+        (StatusCode::UNAUTHORIZED, Json(json!({ "error": "Unauthorized" }))).into_response()
+    }
+}
+
+pub async fn analysis_trajectories(State(store): State<AppState>, Query(query): Query<TrackQuery>) -> impl IntoResponse {
+    match intel::trajectories(&store, &query.object_type, &query.object_id).await {
+        Ok(value) => Json(value).into_response(),
+        Err(err) => (StatusCode::BAD_REQUEST, Json(json!({ "error": err.to_string() }))).into_response(),
+    }
+}
+
+pub async fn analysis_predictions(State(store): State<AppState>, Query(query): Query<TrackQuery>) -> impl IntoResponse {
+    match intel::prediction(&store, &query.object_type, &query.object_id).await {
+        Ok(value) => Json(value).into_response(),
+        Err(err) => (StatusCode::BAD_REQUEST, Json(json!({ "error": err.to_string() }))).into_response(),
+    }
+}
+
+pub async fn analysis_anomalies(State(store): State<AppState>) -> impl IntoResponse {
+    match intel::anomalies(&store).await {
+        Ok(value) => Json(value).into_response(),
+        Err(err) => (StatusCode::BAD_REQUEST, Json(json!({ "error": err.to_string() }))).into_response(),
+    }
+}
+
+pub async fn analysis_correlations(State(store): State<AppState>) -> impl IntoResponse {
+    match intel::correlations(&store).await {
+        Ok(value) => Json(value).into_response(),
+        Err(err) => (StatusCode::BAD_REQUEST, Json(json!({ "error": err.to_string() }))).into_response(),
+    }
+}
+
+pub async fn report_summary(State(store): State<AppState>) -> impl IntoResponse {
+    match intel::report(&store).await {
+        Ok(markdown) => (StatusCode::OK, [("content-type", "text/markdown; charset=utf-8")], markdown).into_response(),
+        Err(err) => (StatusCode::BAD_REQUEST, Json(json!({ "error": err.to_string() }))).into_response(),
+    }
+}
+
+pub async fn fusion_objects(State(store): State<AppState>) -> Json<Value> {
+    let fused = intel::compute_sensor_fusion(&store).await;
+    store.set("fused_objects", fused.clone());
+    Json(fused)
+}
+
+pub async fn shared_list(State(store): State<AppState>, headers: HeaderMap) -> impl IntoResponse {
+    if auth::auth_from_headers(&store, &headers).is_none() {
+        return (StatusCode::UNAUTHORIZED, Json(json!({ "error": "Unauthorized" }))).into_response();
+    }
+    let rows = sqlx::query("SELECT id, kind, title, payload, created_at FROM shared_objects ORDER BY created_at DESC LIMIT 200")
+        .fetch_all(&store.db)
+        .await
+        .unwrap_or_default();
+    Json(json!(rows
+        .into_iter()
+        .map(|row| {
+            json!({
+                "id": row.get::<Uuid, _>("id").to_string(),
+                "kind": row.get::<String, _>("kind"),
+                "title": row.get::<String, _>("title"),
+                "payload": row.get::<serde_json::Value, _>("payload"),
+                "created_at": row.get::<chrono::DateTime<Utc>, _>("created_at").to_rfc3339(),
+            })
+        })
+        .collect::<Vec<_>>()))
+    .into_response()
+}
+
+pub async fn shared_create(State(store): State<AppState>, headers: HeaderMap, Json(body): Json<Value>) -> impl IntoResponse {
+    let Some(claims) = auth::auth_from_headers(&store, &headers) else {
+        return (StatusCode::UNAUTHORIZED, Json(json!({ "error": "Unauthorized" }))).into_response();
+    };
+    let id = Uuid::new_v4();
+    let title = body.get("title").and_then(Value::as_str).unwrap_or("Shared item");
+    let kind = body.get("kind").and_then(Value::as_str).unwrap_or("marker");
+    let payload = body.get("payload").cloned().unwrap_or_else(|| json!({}));
+    let _ = sqlx::query("INSERT INTO shared_objects (id, user_id, kind, title, payload) VALUES ($1, $2, $3, $4, $5)")
+        .bind(id)
+        .bind(Uuid::parse_str(&claims.sub).ok())
+        .bind(kind)
+        .bind(title)
+        .bind(payload.clone())
+        .execute(&store.db)
+        .await;
+    (StatusCode::CREATED, Json(json!({ "id": id.to_string(), "title": title, "kind": kind, "payload": payload }))).into_response()
+}
+
+pub async fn webhook_get(State(store): State<AppState>, headers: HeaderMap) -> impl IntoResponse {
+    let Some(claims) = auth::auth_from_headers(&store, &headers) else {
+        return (StatusCode::UNAUTHORIZED, Json(json!({ "error": "Unauthorized" }))).into_response();
+    };
+    let row = sqlx::query("SELECT webhook_url FROM webhook_settings WHERE user_id = $1")
+        .bind(Uuid::parse_str(&claims.sub).ok())
+        .fetch_optional(&store.db)
+        .await
+        .ok()
+        .flatten();
+    Json(json!({ "webhook_url": row.and_then(|r| r.try_get::<String, _>("webhook_url").ok()) })).into_response()
+}
+
+pub async fn webhook_put(State(store): State<AppState>, headers: HeaderMap, Json(body): Json<Value>) -> impl IntoResponse {
+    let Some(claims) = auth::auth_from_headers(&store, &headers) else {
+        return (StatusCode::UNAUTHORIZED, Json(json!({ "error": "Unauthorized" }))).into_response();
+    };
+    let url = body.get("webhook_url").and_then(Value::as_str);
+    let _ = sqlx::query(
+        "INSERT INTO webhook_settings (user_id, webhook_url) VALUES ($1, $2) ON CONFLICT (user_id) DO UPDATE SET webhook_url = EXCLUDED.webhook_url",
     )
+    .bind(Uuid::parse_str(&claims.sub).ok())
+    .bind(url)
+    .execute(&store.db)
+    .await;
+    StatusCode::OK.into_response()
+}
+
+pub async fn simulation_list(State(store): State<AppState>) -> Json<Value> {
+    Json(store.get("simulation_markers").unwrap_or(json!([])))
+}
+
+pub async fn simulation_create(State(store): State<AppState>, Json(body): Json<Value>) -> impl IntoResponse {
+    let mut items = store.get("simulation_markers").and_then(|v| v.as_array().cloned()).unwrap_or_default();
+    let id = body.get("id").and_then(Value::as_str).unwrap_or("sim").to_string();
+    let marker = json!({
+        "id": if id == "sim" { format!("sim-{}", Uuid::new_v4()) } else { id },
+        "name": body.get("name").and_then(Value::as_str).unwrap_or("Simulation marker"),
+        "lat": body.get("lat").and_then(Value::as_f64).unwrap_or(35.0),
+        "lng": body.get("lng").and_then(Value::as_f64).unwrap_or(135.0),
+        "heading": body.get("heading").and_then(Value::as_f64).unwrap_or(90.0),
+        "speed": body.get("speed").and_then(Value::as_f64).unwrap_or(0.12)
+    });
+    items.push(marker.clone());
+    store.set("simulation_markers", json!(items));
+    (StatusCode::CREATED, Json(marker)).into_response()
+}
+
+pub async fn simulation_update(State(store): State<AppState>, Path(id): Path<String>, Json(body): Json<Value>) -> impl IntoResponse {
+    let mut items = store.get("simulation_markers").and_then(|v| v.as_array().cloned()).unwrap_or_default();
+    for item in &mut items {
+        if item.get("id").and_then(Value::as_str) == Some(id.as_str()) {
+            if let Some(lat) = body.get("lat").and_then(Value::as_f64) {
+                item["lat"] = json!(lat);
+            }
+            if let Some(lng) = body.get("lng").and_then(Value::as_f64) {
+                item["lng"] = json!(lng);
+            }
+            if let Some(speed) = body.get("speed").and_then(Value::as_f64) {
+                item["speed"] = json!(speed);
+            }
+        }
+    }
+    store.set("simulation_markers", json!(items.clone()));
+    Json(json!(items)).into_response()
+}
+
+pub async fn c2_state(State(store): State<AppState>) -> impl IntoResponse {
+    let watchlist = sqlx::query("SELECT id, target_id, target_type, note, created_at FROM watchlist ORDER BY created_at DESC LIMIT 100")
+        .fetch_all(&store.db)
+        .await
+        .unwrap_or_default();
+    let missions = sqlx::query("SELECT id, title, status, payload, created_at FROM missions ORDER BY created_at DESC LIMIT 100")
+        .fetch_all(&store.db)
+        .await
+        .unwrap_or_default();
+    Json(json!({
+        "watchlist": watchlist.into_iter().map(|row| json!({
+            "id": row.get::<Uuid, _>("id").to_string(),
+            "target_id": row.get::<String, _>("target_id"),
+            "target_type": row.get::<String, _>("target_type"),
+            "note": row.try_get::<String, _>("note").ok(),
+            "created_at": row.get::<chrono::DateTime<Utc>, _>("created_at").to_rfc3339(),
+        })).collect::<Vec<_>>(),
+        "missions": missions.into_iter().map(|row| json!({
+            "id": row.get::<Uuid, _>("id").to_string(),
+            "title": row.get::<String, _>("title"),
+            "status": row.get::<String, _>("status"),
+            "payload": row.get::<serde_json::Value, _>("payload"),
+            "created_at": row.get::<chrono::DateTime<Utc>, _>("created_at").to_rfc3339(),
+        })).collect::<Vec<_>>(),
+        "alerts": store.latest_alerts.read().clone(),
+    })).into_response()
+}
+
+pub async fn c2_watchlist_create(State(store): State<AppState>, headers: HeaderMap, Json(body): Json<Value>) -> impl IntoResponse {
+    let Some(claims) = auth::auth_from_headers(&store, &headers) else {
+        return (StatusCode::UNAUTHORIZED, Json(json!({ "error": "Unauthorized" }))).into_response();
+    };
+    let _ = sqlx::query("INSERT INTO watchlist (id, user_id, target_id, target_type, note) VALUES ($1, $2, $3, $4, $5)")
+        .bind(Uuid::new_v4())
+        .bind(Uuid::parse_str(&claims.sub).ok())
+        .bind(body.get("target_id").and_then(Value::as_str).unwrap_or("unknown"))
+        .bind(body.get("target_type").and_then(Value::as_str).unwrap_or("track"))
+        .bind(body.get("note").and_then(Value::as_str))
+        .execute(&store.db)
+        .await;
+    StatusCode::CREATED.into_response()
+}
+
+pub async fn c2_mission_create(State(store): State<AppState>, headers: HeaderMap, Json(body): Json<Value>) -> impl IntoResponse {
+    let Some(claims) = auth::auth_from_headers(&store, &headers) else {
+        return (StatusCode::UNAUTHORIZED, Json(json!({ "error": "Unauthorized" }))).into_response();
+    };
+    let title = body.get("title").and_then(Value::as_str).unwrap_or("Mission").to_string();
+    let status = body.get("status").and_then(Value::as_str).unwrap_or("planned").to_string();
+    let _ = sqlx::query("INSERT INTO missions (id, user_id, title, status, payload) VALUES ($1, $2, $3, $4, $5)")
+        .bind(Uuid::new_v4())
+        .bind(Uuid::parse_str(&claims.sub).ok())
+        .bind(title)
+        .bind(status)
+        .bind(body)
+        .execute(&store.db)
+        .await;
+    StatusCode::CREATED.into_response()
+}
+
+pub async fn c2_alert_rule_create(State(store): State<AppState>, headers: HeaderMap, Json(body): Json<Value>) -> impl IntoResponse {
+    let Some(claims) = auth::auth_from_headers(&store, &headers) else {
+        return (StatusCode::UNAUTHORIZED, Json(json!({ "error": "Unauthorized" }))).into_response();
+    };
+    let title = body.get("title").and_then(Value::as_str).unwrap_or("Alert rule").to_string();
+    let _ = sqlx::query("INSERT INTO shared_objects (id, user_id, kind, title, payload) VALUES ($1, $2, $3, $4, $5)")
+        .bind(Uuid::new_v4())
+        .bind(Uuid::parse_str(&claims.sub).ok())
+        .bind("alert_rule")
+        .bind(title)
+        .bind(body)
+        .execute(&store.db)
+        .await;
+    StatusCode::CREATED.into_response()
+}
+
+pub async fn docs_html() -> Html<String> {
+    Html(format!(
+        r#"<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Graviton API Docs</title>
+    <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
+  </head>
+  <body>
+    <div id="swagger-ui"></div>
+    <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+    <script>
+      window.ui = SwaggerUIBundle({{ url: '/api/openapi.json', dom_id: '#swagger-ui' }});
+    </script>
+  </body>
+</html>"#
+    ))
+}
+
+pub async fn openapi_json() -> Json<Value> {
+    Json(json!({
+        "openapi": "3.0.3",
+        "info": { "title": "Graviton API", "version": "0.2.0" },
+        "paths": {
+            "/api/live-data/fast": { "get": { "summary": "Fast tier live data" } },
+            "/api/live-data/slow": { "get": { "summary": "Slow tier live data" } },
+            "/api/ws/live": { "get": { "summary": "Realtime websocket stream" } },
+            "/api/auth/register": { "post": { "summary": "Register local operator account" } },
+            "/api/auth/login": { "post": { "summary": "Login and receive JWT" } },
+            "/api/team/shared": { "get": { "summary": "List team shared objects" }, "post": { "summary": "Create shared object" } },
+            "/api/analysis/trajectories": { "get": { "summary": "Object movement history" } },
+            "/api/analysis/predictions": { "get": { "summary": "Linear next position estimate" } },
+            "/api/analysis/anomalies": { "get": { "summary": "Current anomalies" } },
+            "/api/analysis/correlations": { "get": { "summary": "Cross-source correlations" } },
+            "/api/report/summary": { "get": { "summary": "Markdown report" } },
+            "/api/fusion/objects": { "get": { "summary": "Sensor-fused tracks" } },
+            "/api/simulation/markers": { "get": { "summary": "Simulation markers" }, "post": { "summary": "Create simulation marker" } },
+            "/api/c2/state": { "get": { "summary": "Command panel state" } },
+            "/api/docs": { "get": { "summary": "Swagger UI" } }
+        }
+    }))
 }
 
 fn check_admin(store: &AppState, headers: &HeaderMap) -> bool {
-    match &store.config.admin_key {
-        Some(key) => headers
-            .get("x-admin-key")
-            .and_then(|v| v.to_str().ok())
-            .map(|v| v == key)
-            .unwrap_or(false),
-        None => true,
-    }
-}
-
-fn classify_ais_type(code: u64) -> &'static str {
-    match code {
-        80..=89 => "tanker",
-        70..=79 => "cargo",
-        60..=69 => "passenger",
-        35 => "military_vessel",
-        36 | 37 => "yacht",
-        _ => "other",
-    }
+    let Some(expected) = store.config.admin_key.as_ref() else {
+        return true;
+    };
+    headers
+        .get("x-admin-key")
+        .and_then(|v| v.to_str().ok())
+        .map(|actual| actual == expected)
+        .unwrap_or(false)
 }

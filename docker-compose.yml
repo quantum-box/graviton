@@ -1,4 +1,35 @@
 services:
+  postgres:
+    image: timescale/timescaledb:latest-pg16
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=graviton
+      - POSTGRES_USER=graviton
+      - POSTGRES_PASSWORD=graviton
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U graviton -d graviton"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
   backend:
     build:
       context: ./backend
@@ -12,8 +43,18 @@ services:
       - OPENSKY_CLIENT_SECRET=${OPENSKY_CLIENT_SECRET:-}
       - ADMIN_KEY=${ADMIN_KEY:-}
       - CORS_ORIGINS=${CORS_ORIGINS:-}
+      - DATABASE_URL=postgres://graviton:graviton@postgres:5432/graviton
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET:-graviton-local-jwt-secret}
+      - AIS_STREAM_URL=${AIS_STREAM_URL:-}
+      - AIRCRAFT_STREAM_URL=${AIRCRAFT_STREAM_URL:-}
     volumes:
       - backend_data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     deploy:
       resources:
         limits:
@@ -53,3 +94,5 @@ services:
 
 volumes:
   backend_data:
+  postgres_data:
+  redis_data:

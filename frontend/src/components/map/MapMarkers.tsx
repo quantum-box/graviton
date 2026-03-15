@@ -16,6 +16,9 @@ const STYLE_MAP: Record<string, any> = {
   gps_jamming: { color: '#f97316', radius: 8 },
   ships: { color: '#22c55e', radius: 5 },
   satellites: { color: '#fde047', radius: 4 },
+  fused_objects: { color: '#f8fafc', radius: 6 },
+  simulation_markers: { color: '#fb7185', radius: 6 },
+  shared_objects: { color: '#34d399', radius: 6 },
   earthquakes: { color: '#fb923c', radius: 5 },
   news: { color: '#a78bfa', radius: 5 },
   firms_fires: { color: '#f97316', radius: 5 },
@@ -46,6 +49,8 @@ export function MapMarkers({ data, layers }: { data: DashboardData; layers: Laye
     gps_jamming: pointCollection(data.fastData?.gps_jamming ?? [], 'gps_jamming'),
     ships: pointCollection(ships, 'ships'),
     satellites: pointCollection(satellites, 'satellites'),
+    fused_objects: pointCollection(data.fastData?.fused_objects ?? [], 'fused_objects'),
+    simulation_markers: pointCollection(data.fastData?.simulation_markers ?? [], 'simulation_markers'),
     earthquakes: pointCollection(data.slowData?.earthquakes ?? [], 'earthquakes'),
     news: pointCollection(data.slowData?.news ?? [], 'news'),
     firms_fires: pointCollection(data.slowData?.firms_fires ?? [], 'firms_fires'),
@@ -55,6 +60,7 @@ export function MapMarkers({ data, layers }: { data: DashboardData; layers: Laye
     kiwisdr: pointCollection(data.slowData?.kiwisdr ?? [], 'kiwisdr'),
     datacenters: pointCollection(data.slowData?.datacenters ?? [], 'datacenters'),
     cctv: pointCollection(data.slowData?.cctv ?? [], 'cctv'),
+    shared_objects: pointCollection(data.slowData?.shared_objects ?? [], 'shared_objects'),
   }
 
   return (

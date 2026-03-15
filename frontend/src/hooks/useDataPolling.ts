@@ -13,6 +13,9 @@ const EMPTY_FAST: FastData = {
   gps_jamming: [],
   ships: [],
   satellites: [],
+  fused_objects: [],
+  simulation_markers: [],
+  alerts: [],
 }
 
 const EMPTY_SLOW: SlowData = {
@@ -28,6 +31,7 @@ const EMPTY_SLOW: SlowData = {
   kiwisdr: [],
   datacenters: [],
   cctv: [],
+  shared_objects: [],
 }
 
 export function useDataPolling() {

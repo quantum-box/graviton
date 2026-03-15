@@ -20,6 +20,8 @@ export default function MapView({
   onZoomChange,
   onViewChange,
   activeTool,
+  trajectory,
+  prediction,
 }: {
   data: DashboardData
   layers: LayerVisibility
@@ -30,6 +32,8 @@ export default function MapView({
   onZoomChange: (zoom: number) => void
   onViewChange?: (view: { lat: number; lng: number; zoom: number }) => void
   activeTool?: string
+  trajectory?: Array<{ lat: number; lng: number }>
+  prediction?: Array<{ lat: number; lng: number }>
 }) {
   const mapRef = useRef<MapRef>(null)
   const [popup, setPopup] = useState<any>(null)
@@ -103,6 +107,17 @@ export default function MapView({
           </Source>
         )}
 
+        {layers.sentinel_overlay && (
+          <Source
+            id="sentinel-overlay"
+            type="raster"
+            tiles={['https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2024_3857/default/g/{z}/{y}/{x}.jpg']}
+            tileSize={256}
+          >
+            <Layer id="sentinel-overlay" type="raster" paint={{ 'raster-opacity': 0.38 }} />
+          </Source>
+        )}
+
         {layers.frontlines && data.slowData?.frontlines && (
           <Source id="frontlines" type="geojson" data={data.slowData.frontlines as any}>
             <Layer id="frontlines-fill" type="fill" paint={{ 'fill-color': '#facc15', 'fill-opacity': 0.1 }} />
@@ -117,6 +132,40 @@ export default function MapView({
         )}
 
         <MapMarkers data={data} layers={layers} />
+
+        {layers.trajectories && trajectory && trajectory.length > 1 && (
+          <Source
+            id="trajectory-line"
+            type="geojson"
+            data={{
+              type: 'Feature',
+              geometry: {
+                type: 'LineString',
+                coordinates: trajectory.map((point) => [point.lng, point.lat]),
+              },
+              properties: {},
+            }}
+          >
+            <Layer id="trajectory-line" type="line" paint={{ 'line-color': '#fbbf24', 'line-width': 2.5, 'line-opacity': 0.95 }} />
+          </Source>
+        )}
+
+        {layers.predictions && prediction && prediction.length > 1 && (
+          <Source
+            id="prediction-line"
+            type="geojson"
+            data={{
+              type: 'Feature',
+              geometry: {
+                type: 'LineString',
+                coordinates: prediction.map((point) => [point.lng, point.lat]),
+              },
+              properties: {},
+            }}
+          >
+            <Layer id="prediction-line" type="line" paint={{ 'line-color': '#f472b6', 'line-width': 2, 'line-dasharray': [1, 1], 'line-opacity': 0.95 }} />
+          </Source>
+        )}
 
         {popup && (
           <Popup longitude={popup.lng} latitude={popup.lat} onClose={() => setPopup(null)} closeButton>

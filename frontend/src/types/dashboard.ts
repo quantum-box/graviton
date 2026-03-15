@@ -19,6 +19,9 @@ export interface FastData {
   gps_jamming: BaseEntity[]
   ships: BaseEntity[]
   satellites: BaseEntity[]
+  fused_objects?: BaseEntity[]
+  simulation_markers?: BaseEntity[]
+  alerts?: BaseEntity[]
 }
 
 export interface SlowData {
@@ -37,6 +40,7 @@ export interface SlowData {
   kiwisdr: BaseEntity[]
   datacenters: BaseEntity[]
   cctv: BaseEntity[]
+  shared_objects?: BaseEntity[]
 }
 
 export interface DashboardData {
@@ -49,4 +53,3 @@ export interface FocusLocation {
   lng: number
   label?: string
 }
-

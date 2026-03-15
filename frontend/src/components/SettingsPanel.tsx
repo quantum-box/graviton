@@ -9,10 +9,11 @@ interface FeedConfig {
   weight: number
 }
 
-export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function SettingsPanel({ open, onClose, token }: { open: boolean; onClose: () => void; token: string | null }) {
   const [adminKey, setAdminKey] = useState('')
   const [feeds, setFeeds] = useState<FeedConfig[]>([])
   const [apiKeys, setApiKeys] = useState<Record<string, string>>({})
+  const [webhookUrl, setWebhookUrl] = useState('')
   const { t } = useTranslation()
 
   useEffect(() => {
@@ -21,7 +22,13 @@ export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () =>
       .then((resp) => resp.json())
       .then((data) => setFeeds(data.feeds ?? []))
       .catch(() => setFeeds([]))
-  }, [open])
+    if (token) {
+      fetch('/api/team/webhook', { headers: { Authorization: `Bearer ${token}` } })
+        .then((resp) => (resp.ok ? resp.json() : { webhook_url: '' }))
+        .then((data) => setWebhookUrl(data.webhook_url ?? ''))
+        .catch(() => setWebhookUrl(''))
+    }
+  }, [open, token])
 
   if (!open) return null
 
@@ -38,6 +45,15 @@ export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () =>
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', 'x-admin-key': adminKey },
       body: JSON.stringify(apiKeys),
+    })
+  }
+
+  async function saveWebhook() {
+    if (!token) return
+    await fetch('/api/team/webhook', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ webhook_url: webhookUrl }),
     })
   }
 
@@ -87,6 +103,21 @@ export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () =>
             {t('settings.saveKeys')}
           </button>
         </div>
+        <div className="mt-6">
+          <div className="mb-2 text-xs uppercase tracking-[0.18em] text-slate-400">Discord Webhook</div>
+          <input
+            placeholder="https://discord.com/api/webhooks/..."
+            value={webhookUrl}
+            onChange={(e) => setWebhookUrl(e.target.value)}
+            className="w-full rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none"
+          />
+          <button onClick={saveWebhook} disabled={!token} className="mt-3 rounded-2xl bg-emerald-500/20 px-4 py-2 text-sm text-emerald-200 disabled:opacity-50">
+            Save webhook
+          </button>
+        </div>
+        <a href="/api/docs" target="_blank" className="mt-6 inline-flex rounded-2xl border border-white/10 px-4 py-2 text-sm text-slate-300">
+          Open API docs
+        </a>
       </div>
     </div>
   )

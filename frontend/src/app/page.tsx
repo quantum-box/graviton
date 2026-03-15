@@ -9,6 +9,7 @@ import {
   CircleHelp,
   Filter,
   Layers3,
+  Lock,
   Map,
   Radio,
   Search,
@@ -28,7 +29,11 @@ import { StatusBar } from '@/components/StatusBar'
 import { ChangelogModal } from '@/components/ChangelogModal'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { RadioInterceptPanel } from '@/components/RadioInterceptPanel'
+import { AuthPanel } from '@/components/AuthPanel'
+import { AlertTray } from '@/components/AlertTray'
+import { C2Panel } from '@/components/C2Panel'
 import { useDataPolling } from '@/hooks/useDataPolling'
+import { useWebSocket } from '@/hooks/useWebSocket'
 import { DashboardDataProvider } from '@/lib/DashboardDataContext'
 
 const MapView = dynamic(() => import('@/components/MapView'), { ssr: false })
@@ -43,6 +48,9 @@ export interface LayerVisibility {
   gps_jamming: boolean
   ships: boolean
   satellites: boolean
+  fused_objects: boolean
+  simulation_markers: boolean
+  shared_objects: boolean
   earthquakes: boolean
   news: boolean
   firms_fires: boolean
@@ -54,6 +62,9 @@ export interface LayerVisibility {
   datacenters: boolean
   cctv: boolean
   weather_radar: boolean
+  sentinel_overlay: boolean
+  trajectories: boolean
+  predictions: boolean
   day_night: boolean
 }
 
@@ -67,6 +78,9 @@ const DEFAULT_LAYERS: LayerVisibility = {
   gps_jamming: true,
   ships: true,
   satellites: true,
+  fused_objects: true,
+  simulation_markers: true,
+  shared_objects: true,
   earthquakes: true,
   news: true,
   firms_fires: false,
@@ -78,6 +92,9 @@ const DEFAULT_LAYERS: LayerVisibility = {
   datacenters: false,
   cctv: false,
   weather_radar: false,
+  sentinel_overlay: false,
+  trajectories: true,
+  predictions: true,
   day_night: true,
 }
 
@@ -105,12 +122,14 @@ function TopToolbar({
   onSearchSelect,
   isLoading,
   onOpenSettings,
+  onOpenAuth,
   onOpenOnboarding,
   onOpenChangelog,
 }: {
   onSearchSelect: (result: { lat: number; lng: number; label?: string } | null) => void
   isLoading: boolean
   onOpenSettings: () => void
+  onOpenAuth: () => void
   onOpenOnboarding: () => void
   onOpenChangelog: () => void
 }) {
@@ -143,6 +162,14 @@ function TopToolbar({
           aria-label="Open release notes"
         >
           <BookOpen size={14} />
+        </button>
+        <button
+          type="button"
+          onClick={onOpenAuth}
+          className="hidden h-8 items-center justify-center rounded-full border border-white/10 px-3 text-xs text-slate-300 transition hover:bg-white/8 lg:inline-flex"
+          aria-label="Open auth"
+        >
+          <Lock size={14} />
         </button>
         <button
           type="button"
@@ -274,6 +301,7 @@ function MobileBottomSheet({
 export default function Dashboard() {
   const { t } = useTranslation()
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [authOpen, setAuthOpen] = useState(false)
   const [onboardingOpen, setOnboardingOpen] = useState(false)
   const [changelogOpen, setChangelogOpen] = useState(false)
   const [layers, setLayers] = useState<LayerVisibility>(DEFAULT_LAYERS)
@@ -285,27 +313,57 @@ export default function Dashboard() {
   const [leftFlyout, setLeftFlyout] = useState<FlyoutId | null>('layers')
   const [mobileSheet, setMobileSheet] = useState<FlyoutId | null>(null)
   const [rightPanelOpen, setRightPanelOpen] = useState(false)
+  const [authToken, setAuthToken] = useState<string | null>(null)
+  const [authUser, setAuthUser] = useState<any>(null)
+  const [sharedObjects, setSharedObjects] = useState<any[]>([])
+  const [trajectory, setTrajectory] = useState<Array<{ lat: number; lng: number }>>([])
+  const [prediction, setPrediction] = useState<Array<{ lat: number; lng: number }>>([])
+  const [c2State, setC2State] = useState<{ watchlist: any[]; missions: any[]; alerts: any[] } | null>(null)
+  const [layout, setLayout] = useState({ c2: { x: 20, y: 420 } })
   const deferredSelectedEntity = useDeferredValue(selectedEntity)
   const { fastData, slowData, isLoading } = useDataPolling()
+  const liveSocket = useWebSocket()
 
-  const filteredFastData = useMemo(() => {
+  const mergedFastData = useMemo(() => {
     if (!fastData) return null
     return {
       ...fastData,
+      fused_objects: liveSocket.datasets.fused_objects ?? fastData.fused_objects ?? [],
+      simulation_markers: liveSocket.datasets.simulation_markers ?? fastData.simulation_markers ?? [],
+      alerts: liveSocket.alerts.length > 0 ? liveSocket.alerts : fastData.alerts ?? [],
+    }
+  }, [fastData, liveSocket.alerts, liveSocket.datasets])
+
+  const mergedSlowData = useMemo(() => {
+    if (!slowData) return null
+    return {
+      ...slowData,
+      shared_objects: sharedObjects.flatMap((item) => {
+        const payload = item.payload ?? {}
+        if (typeof payload.lat !== 'number' || typeof payload.lng !== 'number') return []
+        return [{ ...payload, id: item.id, title: item.title }]
+      }),
+    }
+  }, [slowData, sharedObjects])
+
+  const filteredFastData = useMemo(() => {
+    if (!mergedFastData) return null
+    return {
+      ...mergedFastData,
       military_flights:
         filters.militaryTypes.length === 0
-          ? fastData.military_flights
-          : fastData.military_flights.filter((item: any) => filters.militaryTypes.includes(item.military_type)),
+          ? mergedFastData.military_flights
+          : mergedFastData.military_flights.filter((item: any) => filters.militaryTypes.includes(item.military_type)),
       tracked_flights:
         filters.trackedCategories.length === 0
-          ? fastData.tracked_flights
-          : fastData.tracked_flights.filter((item: any) => filters.trackedCategories.includes(item.alert_category)),
+          ? mergedFastData.tracked_flights
+          : mergedFastData.tracked_flights.filter((item: any) => filters.trackedCategories.includes(item.alert_category)),
       ships:
         filters.yachtCategories.length === 0
-          ? fastData.ships
-          : fastData.ships.filter((item: any) => filters.yachtCategories.includes(item.yacht_category)),
+          ? mergedFastData.ships
+          : mergedFastData.ships.filter((item: any) => filters.yachtCategories.includes(item.yacht_category)),
     }
-  }, [fastData, filters])
+  }, [mergedFastData, filters])
 
   const counts = useMemo(
     () => ({
@@ -318,21 +376,27 @@ export default function Dashboard() {
       gps_jamming: filteredFastData?.gps_jamming?.length ?? 0,
       ships: filteredFastData?.ships?.length ?? 0,
       satellites: filteredFastData?.satellites?.length ?? 0,
-      earthquakes: slowData?.earthquakes?.length ?? 0,
-      news: slowData?.news?.length ?? 0,
-      firms_fires: slowData?.firms_fires?.length ?? 0,
-      gdelt: slowData?.gdelt?.length ?? 0,
-      liveuamap: slowData?.liveuamap?.length ?? 0,
-      frontlines: slowData?.frontlines?.features?.length ?? 0,
-      internet_outages: slowData?.internet_outages?.length ?? 0,
-      kiwisdr: slowData?.kiwisdr?.length ?? 0,
-      datacenters: slowData?.datacenters?.length ?? 0,
-      cctv: slowData?.cctv?.length ?? 0,
+      fused_objects: filteredFastData?.fused_objects?.length ?? 0,
+      simulation_markers: filteredFastData?.simulation_markers?.length ?? 0,
+      shared_objects: mergedSlowData?.shared_objects?.length ?? 0,
+      earthquakes: mergedSlowData?.earthquakes?.length ?? 0,
+      news: mergedSlowData?.news?.length ?? 0,
+      firms_fires: mergedSlowData?.firms_fires?.length ?? 0,
+      gdelt: mergedSlowData?.gdelt?.length ?? 0,
+      liveuamap: mergedSlowData?.liveuamap?.length ?? 0,
+      frontlines: mergedSlowData?.frontlines?.features?.length ?? 0,
+      internet_outages: mergedSlowData?.internet_outages?.length ?? 0,
+      kiwisdr: mergedSlowData?.kiwisdr?.length ?? 0,
+      datacenters: mergedSlowData?.datacenters?.length ?? 0,
+      cctv: mergedSlowData?.cctv?.length ?? 0,
+      sentinel_overlay: 1,
+      trajectories: trajectory.length,
+      predictions: prediction.length,
     }),
-    [filteredFastData, slowData],
+    [filteredFastData, mergedSlowData, trajectory.length, prediction.length],
   )
 
-  const dashboardData = { fastData: filteredFastData, slowData }
+  const dashboardData = { fastData: filteredFastData, slowData: mergedSlowData }
 
   useEffect(() => {
     const seen = window.localStorage.getItem('graviton-onboarding-seen')
@@ -340,10 +404,73 @@ export default function Dashboard() {
       setOnboardingOpen(true)
       window.localStorage.setItem('graviton-onboarding-seen', 'true')
     }
+    const savedToken = window.localStorage.getItem('graviton-jwt')
+    const savedUser = window.localStorage.getItem('graviton-user')
+    const savedLayout = window.localStorage.getItem('graviton-dashboard-layout')
+    const savedLayers = window.localStorage.getItem('graviton-layer-visibility')
+    if (savedToken) setAuthToken(savedToken)
+    if (savedUser) setAuthUser(JSON.parse(savedUser))
+    if (savedLayout) setLayout(JSON.parse(savedLayout))
+    if (savedLayers) setLayers(JSON.parse(savedLayers))
   }, [])
 
   useEffect(() => {
     if (selectedEntity) setRightPanelOpen(true)
+  }, [selectedEntity])
+
+  useEffect(() => {
+    window.localStorage.setItem('graviton-dashboard-layout', JSON.stringify(layout))
+  }, [layout])
+
+  useEffect(() => {
+    window.localStorage.setItem('graviton-layer-visibility', JSON.stringify(layers))
+  }, [layers])
+
+  useEffect(() => {
+    if (!authToken) return
+    fetch('/api/auth/me', { headers: { Authorization: `Bearer ${authToken}` } })
+      .then((resp) => (resp.ok ? resp.json() : null))
+      .then((data) => {
+        if (data?.user) {
+          setAuthUser(data.user)
+          window.localStorage.setItem('graviton-jwt', authToken)
+          window.localStorage.setItem('graviton-user', JSON.stringify(data.user))
+        }
+      })
+      .catch(() => {})
+  }, [authToken])
+
+  useEffect(() => {
+    if (!authToken) return
+    fetch('/api/team/shared', { headers: { Authorization: `Bearer ${authToken}` } })
+      .then((resp) => (resp.ok ? resp.json() : []))
+      .then((data) => setSharedObjects(Array.isArray(data) ? data : []))
+      .catch(() => setSharedObjects([]))
+  }, [authToken])
+
+  useEffect(() => {
+    fetch('/api/c2/state')
+      .then((resp) => resp.json())
+      .then((data) => setC2State(data))
+      .catch(() => setC2State({ watchlist: [], missions: [], alerts: [] }))
+  }, [liveSocket.alerts.length])
+
+  useEffect(() => {
+    const objectId = selectedEntity?.icao24 ?? selectedEntity?.mmsi ?? selectedEntity?.id
+    const objectType = selectedEntity?.mmsi ? 'ship' : selectedEntity?.icao24 ? 'aircraft' : null
+    if (!objectId || !objectType) {
+      setTrajectory([])
+      setPrediction([])
+      return
+    }
+    fetch(`/api/analysis/trajectories?object_type=${objectType}&object_id=${objectId}`)
+      .then((resp) => resp.json())
+      .then((data) => setTrajectory(data.points ?? []))
+      .catch(() => setTrajectory([]))
+    fetch(`/api/analysis/predictions?object_type=${objectType}&object_id=${objectId}`)
+      .then((resp) => resp.json())
+      .then((data) => setPrediction(data.line ?? []))
+      .catch(() => setPrediction([]))
   }, [selectedEntity])
 
   function renderFlyoutContent(id: FlyoutId) {
@@ -369,7 +496,7 @@ export default function Dashboard() {
   }
 
   return (
-    <DashboardDataProvider fastData={filteredFastData} slowData={slowData} selectedEntity={selectedEntity} setSelectedEntity={setSelectedEntity}>
+    <DashboardDataProvider fastData={filteredFastData} slowData={mergedSlowData} selectedEntity={selectedEntity} setSelectedEntity={setSelectedEntity}>
       <div className="relative h-screen w-screen overflow-hidden bg-[#07101a] text-[var(--text-primary)]">
         <ErrorBoundary fallbackTitle={t('shell.mapCanvas')}>
           <MapView
@@ -380,10 +507,14 @@ export default function Dashboard() {
             onSelect={setSelectedEntity}
             onMouseMove={setMouseCoords}
             onZoomChange={setZoom}
+            trajectory={trajectory}
+            prediction={prediction}
           />
         </ErrorBoundary>
 
         <div className="pointer-events-none absolute inset-0 z-20">
+          <AlertTray alerts={filteredFastData?.alerts ?? liveSocket.alerts} />
+
           <div className="absolute inset-x-3 top-3 hidden md:block">
             <TopToolbar
               onSearchSelect={(location) => {
@@ -393,6 +524,7 @@ export default function Dashboard() {
               }}
               isLoading={isLoading}
               onOpenSettings={() => setSettingsOpen(true)}
+              onOpenAuth={() => setAuthOpen(true)}
               onOpenOnboarding={() => setOnboardingOpen(true)}
               onOpenChangelog={() => setChangelogOpen(true)}
             />
@@ -444,7 +576,7 @@ export default function Dashboard() {
                   </button>
                 </div>
                 <div className="min-h-0 flex-1 overflow-y-auto">
-                  <RightPanel selectedEntity={deferredSelectedEntity} fastData={filteredFastData} slowData={slowData} focusLocation={focusLocation} className="h-full bg-transparent" />
+                  <RightPanel selectedEntity={deferredSelectedEntity} fastData={filteredFastData} slowData={mergedSlowData} focusLocation={focusLocation} className="h-full bg-transparent" />
                 </div>
               </motion.aside>
             )}
@@ -459,6 +591,14 @@ export default function Dashboard() {
               <div className="min-w-0 flex-1">
                 <FindLocateBar onSelect={(location) => setFocusLocation(location)} />
               </div>
+              <button
+                type="button"
+                onClick={() => setAuthOpen(true)}
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 text-slate-300"
+                aria-label="Open auth"
+              >
+                <Lock size={15} />
+              </button>
               <button
                 type="button"
                 onClick={() => setSettingsOpen(true)}
@@ -533,7 +673,7 @@ export default function Dashboard() {
                     </button>
                   </div>
                   <div className="max-h-[calc(74vh-64px)] overflow-y-auto px-4 pb-6">
-                    <RightPanel selectedEntity={deferredSelectedEntity} fastData={filteredFastData} slowData={slowData} focusLocation={focusLocation} className="bg-transparent" />
+                    <RightPanel selectedEntity={deferredSelectedEntity} fastData={filteredFastData} slowData={mergedSlowData} focusLocation={focusLocation} className="bg-transparent" />
                   </div>
                 </motion.section>
               </motion.div>
@@ -541,11 +681,37 @@ export default function Dashboard() {
           </AnimatePresence>
         </div>
 
+        <C2Panel
+          token={authToken}
+          state={c2State}
+          selectedEntity={deferredSelectedEntity}
+          onRefresh={() => {
+            fetch('/api/c2/state')
+              .then((resp) => resp.json())
+              .then((data) => setC2State(data))
+              .catch(() => {})
+          }}
+          position={layout.c2}
+          onMove={(position) => setLayout((current) => ({ ...current, c2: position }))}
+        />
+
         <div className="pointer-events-none absolute inset-x-3 bottom-3 z-20">
           <StatusBar coords={mouseCoords} zoom={zoom} counts={counts} statusLabel={focusLocation?.label} />
         </div>
 
-        <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+        <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} token={authToken} />
+        <AuthPanel
+          token={authToken}
+          user={authUser}
+          open={authOpen}
+          onClose={() => setAuthOpen(false)}
+          onAuthenticated={({ token, user }) => {
+            setAuthToken(token)
+            setAuthUser(user)
+            window.localStorage.setItem('graviton-jwt', token)
+            window.localStorage.setItem('graviton-user', JSON.stringify(user))
+          }}
+        />
         <OnboardingModal open={onboardingOpen} onClose={() => setOnboardingOpen(false)} />
         <ChangelogModal open={changelogOpen} onClose={() => setChangelogOpen(false)} />
       </div>

@@ -69,6 +69,17 @@ pub fn spawn_all(store: Arc<DataStore>) {
     });
 
     tracing::info!("All background fetchers spawned");
+    crate::realtime::spawn(store);
+}
+
+pub fn spawn_manual_refresh(store: Arc<DataStore>) {
+    tokio::spawn(async move {
+        let _ = flights::fetch(&store).await;
+        let _ = ships::fetch(&store).await;
+        let _ = satellites::fetch(&store).await;
+        let _ = earthquakes::fetch(&store).await;
+        let _ = news::fetch(&store).await;
+    });
 }
 
 fn spawn_periodic<F, Fut>(name: &'static str, store: Arc<DataStore>, period: Duration, f: F)

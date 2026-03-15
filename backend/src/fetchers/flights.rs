@@ -8,6 +8,16 @@ use std::{
 use super::{military, plane_alert, retry};
 
 pub async fn fetch(store: &Arc<DataStore>) -> anyhow::Result<()> {
+    if let Some(cached) = store.cache_get_json("fetcher:flights").await.ok().flatten() {
+        if let Some(obj) = cached.as_object() {
+            for key in ["commercial_flights", "private_flights", "private_jets", "military_flights", "tracked_flights", "uavs", "gps_jamming"] {
+                if let Some(value) = obj.get(key) {
+                    store.set(key, value.clone());
+                }
+            }
+        }
+    }
+
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(15))
         .build()?;
@@ -78,6 +88,26 @@ pub async fn fetch(store: &Arc<DataStore>) -> anyhow::Result<()> {
     store.set("uavs", json!(uavs));
     store.set("gps_jamming", json!(aggregate_jamming(jamming_samples)));
     store.update_etag("fast");
+    let _ = store
+        .cache_set_json(
+            "fetcher:flights",
+            &json!({
+                "commercial_flights": store.get("commercial_flights").unwrap_or(json!([])),
+                "private_flights": store.get("private_flights").unwrap_or(json!([])),
+                "private_jets": store.get("private_jets").unwrap_or(json!([])),
+                "military_flights": store.get("military_flights").unwrap_or(json!([])),
+                "tracked_flights": store.get("tracked_flights").unwrap_or(json!([])),
+                "uavs": store.get("uavs").unwrap_or(json!([])),
+                "gps_jamming": store.get("gps_jamming").unwrap_or(json!([])),
+            }),
+            120,
+        )
+        .await;
+    let _ = store.persist_positions("aircraft", "polling", &store.get("commercial_flights").and_then(|v| v.as_array().cloned()).unwrap_or_default()).await;
+    let _ = store.persist_positions("aircraft", "polling", &store.get("military_flights").and_then(|v| v.as_array().cloned()).unwrap_or_default()).await;
+    let fused = crate::intel::compute_sensor_fusion(store).await;
+    store.set("fused_objects", fused);
+    let _ = crate::intel::detect_rule_alerts(store).await;
     Ok(())
 }
 

@@ -15,6 +15,9 @@ mod store;
 mod models;
 mod fetchers;
 mod routes;
+mod auth;
+mod intel;
+mod realtime;
 
 pub type AppState = Arc<store::DataStore>;
 
@@ -26,7 +29,8 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let store = Arc::new(store::DataStore::new());
+    let store = Arc::new(store::DataStore::new().await.expect("store init"));
+    let _ = store.load_recent_alerts().await;
 
     // Spawn background fetchers
     fetchers::spawn_all(store.clone());
@@ -67,6 +71,32 @@ async fn main() {
         .route("/api/ais/feed", post(routes::ais_feed))
         // Sentinel-2 search
         .route("/api/sentinel2/search", get(routes::sentinel_search))
+        // Realtime
+        .route("/api/ws/live", get(routes::ws_live))
+        // Analysis
+        .route("/api/analysis/trajectories", get(routes::analysis_trajectories))
+        .route("/api/analysis/predictions", get(routes::analysis_predictions))
+        .route("/api/analysis/anomalies", get(routes::analysis_anomalies))
+        .route("/api/analysis/correlations", get(routes::analysis_correlations))
+        .route("/api/report/summary", get(routes::report_summary))
+        .route("/api/fusion/objects", get(routes::fusion_objects))
+        // Auth
+        .route("/api/auth/register", post(routes::auth_register))
+        .route("/api/auth/login", post(routes::auth_login))
+        .route("/api/auth/me", get(routes::auth_me))
+        // Collaboration
+        .route("/api/team/shared", get(routes::shared_list).post(routes::shared_create))
+        .route("/api/team/webhook", get(routes::webhook_get).put(routes::webhook_put))
+        // Simulation and C2
+        .route("/api/simulation/markers", get(routes::simulation_list).post(routes::simulation_create))
+        .route("/api/simulation/markers/{id}", post(routes::simulation_update).put(routes::simulation_update))
+        .route("/api/c2/state", get(routes::c2_state))
+        .route("/api/c2/watchlist", post(routes::c2_watchlist_create))
+        .route("/api/c2/missions", post(routes::c2_mission_create))
+        .route("/api/c2/alerts", post(routes::c2_alert_rule_create))
+        // Docs
+        .route("/api/docs", get(routes::docs_html))
+        .route("/api/openapi.json", get(routes::openapi_json))
         .layer(CompressionLayer::new())
         .layer(cors)
         .layer(TraceLayer::new_for_http())
